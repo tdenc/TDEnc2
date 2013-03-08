@@ -1,0 +1,4 @@
+.DS_Store
+tool/*
+mp4/
+!tool/TDEnc2.sh

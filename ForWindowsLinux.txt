@@ -1,0 +1,29 @@
+WindowsやLinuxユーザー用の簡易FAQ
+
+○WindowsでTDEnc2を使いたい
+ 従来のつんでれんこ（最新版は2.76）でほぼ同様のことができるのでそちらを使ってください。
+ ただし、TDEnc2のコア部分はBashで書いてあるので、Bashが使用可能な環境ならば使えます。
+ toolフォルダにWindows用の以下の4つのツールを入れて、コマンドラインから使用可能です。
+ ・ffmpeg ( with libx264 )
+ ・MP4Box
+ ・mediainfo
+ ・x264 ( with lavf and ffms )
+ また、neroAacEnc.exeをtoolフォルダに入れればneroAacEncを使うようになっています。
+ デフォルトではffmpegですので、音質が気になる場合はneroAacEncを自分でインストールしてください。
+
+○LinuxでTDEnc2を使いたい
+ 上記のようにコア部分をBashで書いたので、Linuxでも使用できます。
+ apt-getやyumなどを利用して、システムにffmpeg、MP4Box、mediainfo、x264を入れてください。
+ ffmpegはlibx264つきで、x264はlavfとffmsつきでコンパイルしてください。
+ なお、neroAacEncはLinux版も存在し、ffmpegより高音質でエンコードできます。
+ toolフォルダに入れればneroAacEncを使うようになっていますので、そちらの機能もどうぞ。
+
+○コマンドラインからTDEnc2をどう使えばいいかわからない
+ 以下にWindowsやLinxuでのコマンドラインからの使用例を挙げます。
+ ・./tool/TDEnc2.sh movie.avi とすれば通常の単品エンコードモード
+ ・./tool/TDEnc2.sh video.avi audio.wav とすれば音声を入れかえるモード
+ ・./tool/TDEnc2.sh video1.avi audio2.avi とすれば連続エンコードモード
+ 他にもいろいろ試してみてください。
+
+なお、このテキストは適宜情報を追加・修正していきます。
+

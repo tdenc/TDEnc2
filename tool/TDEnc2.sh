@@ -1,0 +1,1495 @@
+#!/bin/bash
+current_dir="$(dirname "$0")"
+cd "${current_dir}"
+
+
+####################################################################################################
+# Variables
+####################################################################################################
+# version of this script
+current_version="2.00"
+# use proccess ID for multiple-running
+temp_dir="temp/$$"
+temp_264="${temp_dir}/video.h264"
+temp_wav="${temp_dir}/audio.wav"
+temp_m4a="${temp_dir}/audio.m4a"
+temp_mp4="${temp_dir}/movie.mp4"
+ver_txt="current_version"
+[ -s "${ver_txt}" ] && current_version=$(cat "${ver_txt}")
+# read user settings
+# edit message.conf to use TDEnc2 in your native language :)
+. "../setting/message.conf"
+. "../setting/default_setting"
+. "../setting/user_setting.conf"
+. "../setting/x264_option.conf"
+. "../setting/ffmpeg_option.conf"
+mkdir -p "${temp_dir}"
+[ -d "${mp4_dir}" ] || mkdir "${mp4_dir}"
+# escape sequence
+if $(echo ${TERM} | grep -iq 'xterm'); then
+  color_green=$'\e[32m'
+  color_blue=$'\e[34m'
+  color_red=$'\e[31m'
+  color_purple=$'\e[35m'
+  color_reset=$'\e[0m'
+else
+  color_green=""
+  color_blue=""
+  color_red=""
+  color_purple=""
+  color_reset=""
+fi
+# prompt for `select`
+PS3=">> "
+
+
+####################################################################################################
+# Data Structures
+####################################################################################################
+# i wish i could use bash 4 for associative arrays...
+# question_info    = (
+#              [0]    question_level      : 1-3 ( 1:easy, 3:difficult )
+#              [1]    upload_site         : 1-2 ( 1:niconico, 2:youtube )
+#              [2]    preset_type         : 1-9 ( 7:sing, 8:user-preset ,9:youtube )
+#              [3]    account_type        : 1-2 ( 1:premium, 2:normal )
+#              [4]    enc_type            : 1-2 ( 1:high, 2:economy )
+#              [5]    crf_enc             : 1-2 ( 1:auto, 2:no, 3:manual )
+#              [6]    dec_type            : 1-2 ( 1:fast, 2:normal )
+#              [7]    flash_type          : 1-3 ( 1:normal, 3:strict )
+#              [8]    video_deint         : 1-2 ( 1:auto, 2:no, 3:force )
+#              [9]    video_resize        : 1-2 ( 1:auto, 2:no, 3:manual )
+#              [10]   total_time_sec      : int
+#              [11]   o_video_width       : int
+#              [12]   o_video_height      : int
+#              [13]   crf_value           : float
+#              [14]   video_bitrate       : int
+#              [15]   audio_bitrate       : int
+#              [16]   audio_samplingrate  : 1-4 ( 1:44100, 2:48000, 3:96000, 4:same as source )
+#              [17]   samplingrate_value  : int
+#              [18]   limit_bitrate       : int
+#                    )
+# video_info   = (
+#           [0]   Duration
+#           [1]   BitRate
+#           [2]   FrameRate
+#           [3]   Width
+#           [4]   Height
+#           [5]   DisplayAspectRatio
+#           [6]   PixelAspectRatio
+#           [7]   ScanType
+#                )
+# audio_info   = (
+#           [0]   Duration
+#           [1]   BitRate
+#           [2]   SamplingRate
+#           [3]   Channels
+#                )
+
+
+####################################################################################################
+# Functions
+####################################################################################################
+tdeHander()
+{
+  # delete temporary files when C-c
+  rm -rf "${temp_dir}"
+  exit 1
+}
+tdeError()
+{
+  # if you dont want to delete log files for debugging, comment out the following line
+  rm -rf "${temp_dir}"
+  read -p " ${pause_message1}"
+  echo "${color_blue}${border_line}${color_reset}" >&2
+  exit 1
+}
+tdeSuccess()
+{
+  rm -rf "${temp_dir}"
+  read -p " ${pause_message2}"
+  echo "${color_blue}${border_line}${color_reset}" >&2
+  [ "${os}" = "Mac" ] && open "${mp4_dir}"
+  exit 0
+}
+# Usage: tdeEcho ${long_message}
+tdeEcho()
+{
+  echo "" >&2
+  echo "${color_blue}${border_line}" >&2
+  for item in "$@"
+  do
+    echo " ${color_reset}${item}" >&2
+  done
+  echo "${color_blue}${border_line}${color_reset}" >&2
+}
+# Usage: tdeEchoS ${short_message}
+tdeEchoS()
+{
+  echo "" >&2
+  echo "${color_purple}${short_line}" >&2
+  for item in "$@"
+  do
+    echo " ${color_reset}${item}" >&2
+  done
+  echo "${color_purple}${short_line}${color_reset}" >&2
+  sleep 1
+}
+# Usage: tdeMin "${int1}" "${int2}" ( returns the smaller )
+tdeMin()
+{
+  [ "$1" -le "$2" ] && echo "$1" || echo "$2"
+}
+# Usage: tdeMin "${float1} + ${float2}" ( returns the result )
+#        tdeMin "${float1} > ${float2}" ( returns 1 if true, 0 if false )
+tdeBc()
+{
+  echo "scale=3; $1" | bc
+}
+# Usage: tdeMediaInfo -v[-a|-g] "${Param}" "${input_filename}"
+tdeMediaInfo()
+{
+  case "$1" in
+    -v) media_param="Video";;
+    -a) media_param="Audio";;
+    -g) media_param="General";;
+  esac
+  ${tool_mediainfo} --Inform\=${media_param}\;%"$2"% "$3"
+}
+# tdeVideoInfo() for video_info[] and tdeAudioInfo() for audio_info[]
+tdeVideoInfo()
+{
+  local video_duration=$(tdeMediaInfo -v Duration "$1")
+  local video_bitrate=$(tdeMediaInfo -v BitRate "$1")
+  local video_fps=$(tdeMediaInfo -v FrameRate "$1")
+  local video_width=$(tdeMediaInfo -v Width "$1")
+  local video_height=$(tdeMediaInfo -v Height "$1")
+  local video_dar=$(tdeMediaInfo -v DisplayAspectRatio "$1")
+  local video_par=$(tdeMediaInfo -v PixelAspectRatio "$1")
+  local video_scantype=$(tdeMediaInfo -v ScanType "$1")
+  cat <<EOF
+  ${video_duration:-0}
+  ${video_bitrate:-0}
+  ${video_fps:-30}
+  ${video_width:-0}
+  ${video_height:-0}
+  ${video_dar:-1.778}
+  ${video_par:-1}
+  ${video_scantype:-Progressive}
+EOF
+}
+tdeAudioInfo()
+{
+  local audio_duration=$(tdeMediaInfo -a Duration "$1")
+  local audio_bitrate=$(tdeMediaInfo -a BitRate "$1")
+  local audio_samplingrate=$(tdeMediaInfo -a SamplingRate "$1")
+  local audio_channels=$(tdeMediaInfo -a Channels "$1")
+  cat <<EOF
+  ${audio_duration:-0}
+  ${audio_bitrate:-0}
+  ${audio_samplingrate:-48000}
+  ${audio_channels:-2}
+EOF
+  tdeEchoS "${analyze_end}" >&2
+}
+# Usage: tdeShowInfo "${video_filename}" ["${audio_filename}"]
+tdeShowInfo()
+{
+  cat <<EOF
+ File Format    : $(tdeMediaInfo -g Format "$1") ($(tdeMediaInfo -g FileExtension "$1"))
+ File Size      : $(tdeMediaInfo -g FileSize/String "$1")
+ Total Bitrate  : $(tdeMediaInfo -g OverallBitRate/String "$1")
+ Duration       : $(tdeMediaInfo -g Duration/String "$1")
+ Video Codec    : $(tdeMediaInfo -v Format "$1")
+ Video Bitrate  : $(tdeMediaInfo -v BitRate/String "$1")
+ Video Width    : $(tdeMediaInfo -v Width/String "$1")
+ Video Height   : $(tdeMediaInfo -v Height/String "$1")
+ Framerate      : $(tdeMediaInfo -v FrameRate/String "$1")
+ Aspect Ratio   : $(tdeMediaInfo -v DisplayAspectRatio/String "$1")
+EOF
+if [ "$#" -eq 1 ]; then
+  cat <<EOF
+ Audio Codec    : $(tdeMediaInfo -a Format "$1")
+ Audio Bitrate  : $(tdeMediaInfo -a BitRate/String "$1")
+ Samlingrate    : $(tdeMediaInfo -a SamplingRate/String "$1")
+ Channels       : $(tdeMediaInfo -a Channels "$1")
+EOF
+else
+  cat <<EOF
+ Audio Codec    : $(tdeMediaInfo -a Format "$2")
+ Audio Bitrate  : $(tdeMediaInfo -a BitRate/String "$2")
+ Samlingrate    : $(tdeMediaInfo -a SamplingRate/String "$2")
+ Channels       : $(tdeMediaInfo -a Channels "$2")
+EOF
+fi
+}
+tdeAskQuestion()
+{
+  # define local variables
+  local question_level="${question_level}"
+  local upload_site="${upload_site}"
+  local preset_type="${preset_type}"
+  local account_type="${account_type}"
+  local enc_type="${enc_type}"
+  local total_bitrate="${total_bitrate}"
+  local crf_enc="${crf_enc}"
+  local crf_value="${crf_value}"
+  local dec_type="${dec_type}"
+  local flash_type="${flash_type}"
+  local video_deint="${video_deint}"
+  local video_resize="${video_resize}"
+  local resize_value="${resize_value}"
+  local audio_bitrate="${audio_bitrate}"
+  local audio_samplingrate="${audio_samplingrate}"
+  local skip_mode="${skip_mode}"
+  local ret str
+  local x264_pass
+  local account_type account_start1 account_start2 account_list1 account_list2
+  local limit_bitrate
+  local temp_total_bitrate
+  local a_max_bitrate
+  local video_bitrate
+  local samplingrate_value
+  local confirm_end
+
+  # additional variables for bitrate and video resolution
+  local total_time_sec=$(( (${video_info[0]} + 500) / 1000 ))
+  local p_temp_bitrate=$(tdeBc "${size_premium} * 1024 * 8 / ${total_time_sec}")
+        p_temp_bitrate=${p_temp_bitrate%%[\.]*}
+  local i_temp_bitrate=$(tdeBc "${size_normal} * 1024 * 8 / ${total_time_sec}")
+        i_temp_bitrate=${i_temp_bitrate%%[\.]*}
+  local y_p_temp_bitrate=$(tdeBc "${size_youtube_partner} * 1024 * 8 / ${total_time_sec}")
+        y_p_temp_bitrate=${y_p_temp_bitrate%%[\.]*}
+  local y_i_temp_bitrate=$(tdeBc "${size_youtube_normal} * 1024 * 8 / ${total_time_sec}")
+        y_i_temp_bitrate=${y_i_temp_bitrate%%[\.]*}
+  local s_v_bitrate=$(tdeBc "${video_info[1]} / 1000")
+        s_v_bitrate=${s_v_bitrate%%[\.]*}
+  local i_video_height="${video_info[4]}"
+  local o_video_height=$((${auto_height} + ${auto_height} % 2))
+  local i_video_width=$(tdeBc "${video_info[3]} * ${video_info[6]}")
+        i_video_width=${i_video_width%%[\.]*}
+  if [ -n "${auto_width}" ]; then
+    local o_video_width=$((${auto_width} + ${auto_width} % 2))
+  else
+    local o_video_width=$(tdeBc "${auto_height} * ${i_video_width} / ${video_info[4]}")
+    o_video_width=${o_video_width%%[\.]*}
+    o_video_width=$((${o_video_width} + ${o_video_width} % 2))
+  fi
+
+  # start question
+  tdeEcho $question_start{1,2}
+
+  # question level
+  case "${question_level}" in
+    1|2|3) ;;
+    *)
+      tdeEcho $level_start{1..3}
+      select item in $level_list{1..3}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        question_level="${REPLY}"
+        break
+      done
+      ;;
+  esac
+  if [ "${question_level}" -le 2 ]; then
+    crf_enc=1
+    enc_type=1
+    dec_type=2
+    video_deint=1
+    audio_samplingrate=1
+    if [ "${question_level}" -eq 1 ]; then
+      preset_type=2
+      total_bitrate=0
+      flash_type=1
+      video_resize=1
+    fi
+  fi
+
+  # upload site
+  case "${upload_site}" in
+    1|2) ;;
+    *)
+      tdeEcho "${upload_site_start}"
+      select item in "NicoNico" "YouTube"
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        upload_site="${REPLY}"
+        break
+      done
+      ;;
+  esac
+  if [ "${upload_site}" -eq 2 ]; then
+    preset_type=9
+    audio_samplingrate=2
+    enc_type=1
+    crf_enc=1
+    dec_type=2
+    video_resize=2
+    flash_type=1
+  fi
+
+  # choose preset
+  case "${preset_type}" in
+    [1-9]) ;;
+    *)
+      tdeEcho $preset_start{1,2}
+      select item in $preset_list{1..8}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        [ "${REPLY}" -eq 7 -a "${video_ext}" != "mp4" ] && tdeEcho "${preset_message}" && continue
+        preset_type="${REPLY}"
+        break
+      done
+      ;;
+  esac
+  case "${preset_type}" in
+    1|4)
+      crf_enc=2
+      ;;
+    7)
+      crf_enc=2
+      video_deint=3
+      flash_type=1
+      dec_type=2
+      video_resize=2
+      total_bitrate="${p_temp_bitrate}"
+      ;;
+    8)
+      enc_type=1
+      dec_type=2
+      ;;
+  esac
+
+  # choose account type
+  if [ "${preset_type}" -ne 9 ]; then
+    account_type="${y_account_type}"
+    account_start1="${premium_start1}"
+    account_start2="${premium_start2}"
+    account_list1="${premium_list1}"
+    account_list2="${premium_list2}"
+  else
+    account_type="${n_account_type}"
+    account_start1="${premium_start3}"
+    account_start2="${premium_start4}"
+    account_list1="${premium_list3}"
+    account_list2="${premium_list4}"
+  fi
+  case "${account_type}" in
+    1|2) ;;
+    *)
+      tdeEcho $account_start{1,2}
+      select item in $account_list{1,2}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        account_type="${REPLY}"
+        break
+      done
+      ;;
+  esac
+  if [ "${preset_type}" -eq 9 -a "${account_type}" -eq 2 ]; then
+    ret=$(tdeBc "${total_time_sec} >= $((15 * 60))")
+    [ "${ret}" -eq 1 ] && tdeEcho $youtube_error{1,2} && tdeError
+  fi
+
+  # economy mode
+  case "${enc_type}" in
+    1|2) ;;
+    *)
+      tdeEcho $economy_start1
+      select item in $economy_list{1,2}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        eco_type="${REPLY}"
+        break
+      done
+      ;;
+  esac
+  if [ "${enc_type}" -eq 2 ]; then
+    limit_bitrate="${e_max_bitrate}"
+    if [ "${account_type}" -eq 1 ]; then
+      total_bitrate=$(tdeMin "${e_max_bitrate}" "${p_temp_bitrate}")
+    else
+      total_bitrate=$(tdeMin "${e_max_bitrate}" "${i_temp_bitrate}")
+    fi
+  fi
+
+  # total bitrate
+  if [ "${upload_site}" -eq 2 ]; then
+    if [ "${account_type}" -eq 1 ]; then
+      total_bitrate="${y_p_temp_bitrate}"
+      limit_bitrate="${y_p_temp_bitrate}"
+    else
+      total_bitrate="${y_i_temp_bitrate}"
+      limit_bitrate="${y_i_temp_bitrate}"
+    fi
+  else
+    if [ "${account_type}" -eq 1 ]; then
+      limit_bitrate="${p_temp_bitrate}"
+      str=$(echo -n "${total_bitrate}" |sed 's/[0-9]//g')
+      if [ -z "${total_bitrate}" -o -n "${str}" ]; then
+        tdeEcho $bitrate_start{1,2}
+        while read -p "$PS3" input
+        do
+          str=$(echo -n "${input}" |sed 's/[0-9]//g')
+          [ -z "${input}" -o -n "${str}" ] && tdeEcho "${return_message2}" && continue
+          ret=$(tdeBc "${input} > ${limit_bitrate}")
+          if [ "${ret}" -eq 1 ]; then
+            tdeEcho $return_message{3..5}
+            tdeEchoS "${limit_message1}${limit_bitrate}"
+            continue
+          fi
+          total_bitrate="${input}"
+          temp_total_bitrate=$(tdeMin "${total_bitrate}" "${p_temp_bitrate}")
+          break
+        done
+      fi
+      [ "${total_bitrate}" -eq 0 ] && total_bitrate="${limit_bitrate}"
+    else
+      limit_bitrate="${i_max_bitrate}"
+      total_bitrate=$(tdeMin "${i_temp_bitrate}" "${i_target_bitrate}")
+    fi
+  fi
+
+  # crf encode
+  [ "${total_bitrate}" -lt "${bitrate_threshold}" ] && crf_enc=2
+  [ -n "${crf_value}" ] && crf_enc=3
+  case "${crf_enc}" in
+    [1-3]) ;;
+    *)
+      tdeEcho $br_mode_start{1..4}
+      select item in $br_mode_list{1..3}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        crf_enc="${REPLY}"
+        break
+      done
+      ;;
+  esac
+  case "${crf_enc}" in
+    1)
+      if [ "${upload_site}" -eq 2 ]; then
+        crf_value="${crf_you}"
+      elif [ "${account_type}" -eq 1 ]; then
+        crf_value="${crf_high}"
+      else
+        crf_value="${crf_low}"
+      fi
+      ;;
+    2)
+      crf_value=-1
+      ;;
+    3)
+      while [ -z "${crf_value}" ]
+      do
+        tdeEcho $crf_value_start{1,2}
+        while read -p "$PS3" input
+        do
+          [ -z "${input}" ] && tdeEcho "${return_message7}" && continue
+          ret=$(tdeBc "${input} > 0")
+          [ "${ret}" -eq 0 ] && tdeEcho "${return_message7}" && continue
+          crf_value="${input}"
+          break
+        done
+      done
+      ;;
+  esac
+
+  # fast decode
+  case "${dec_type}" in
+    1|2) ;;
+    *)
+      tdeEcho $decode_start{1..4}
+      select item in $decode_list{1,2}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        dec_type="${REPLY}"
+        break
+      done
+      ;;
+  esac
+
+  # flash player
+  case "${flash_type}" in
+    1|2) ;;
+    *)
+      tdeEcho $flash_start{1..5}
+      select item in $flash_list{1..3}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        flash_type="${REPLY}"
+        break
+      done
+      ;;
+  esac
+
+  # deinterlace
+  case "${video_deint}" in
+    [1-3]) ;;
+    *)
+      tdeEcho $deint_start1
+      select item in $deint_list{1..3}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        video_deint="${REPLY}"
+        break
+      done
+      ;;
+  esac
+
+  # video resize
+  case "${video_resize}" in
+    [1-3]) ;;
+    *)
+      tdeEcho $resize_start{1..3}
+      select item in $resize_list{1..3}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        video_resize="${REPLY}"
+        break
+      done
+      ;;
+  esac
+  if [ "${video_resize}" -eq 2 ]; then
+    o_video_width="${i_video_width}"
+    o_video_height="${i_video_height}"
+  elif [ "${video_resize}" -eq 3 ]; then
+    while [ -z "${resize_value}" ]
+    do
+      tdeEcho ${resize_value_start}
+      while read -p "$PS3" input
+      do
+        [ -z "${input}" ] && tdeEcho "${return_message7}" && continue
+        str=$(echo -n "${input}" |sed 's/[0-9]//g')
+        if [[ "${str}" =~ [:x] ]]; then
+          o_video_width=${input%%[:x]*}
+          o_video_height=${input##*[:x]}
+          if [ -n "${o_video_width}" -a -n "${o_video_height}" ]; then
+            resize_value="${input}"
+            break
+          fi
+        fi
+        tdeEcho "${return_message7}"
+        continue
+      done
+    done
+  fi
+  if [ "${upload_site}" -eq 1 -a "${account_type}" -eq 2 ]; then
+    if [ "${o_video_width}" -gt "${i_max_width}" -o "${o_video_height}" -gt "${i_max_height}" ]; then
+      [ "${preset_type}" -eq 7 ] && tdeEcho $return_message{8,9} || tdeEcho $return_message{10,11}
+      tdeError
+    fi
+  fi
+
+  # audio bitrate
+  if [ "${preset_type}" -eq 7 ];then
+    a_max_bitrate=$((${total_bitrate} - ${s_v_bitrate}))
+  else
+    a_max_bitrate=${total_bitrate}
+    if [ "${upload_site}" -eq 2 ]; then
+      if [ "${audio_info[3]}" -eq 2 ]; then
+        audio_bitrate="${y_stereo_bitrate}"
+      else
+        audio_bitrate="${y_surround_bitrate}"
+      fi
+    elif [ "${question_level}" -eq 1 ]; then
+      if [ "${account_type}" -eq 1 ]; then
+        audio_bitrate=192
+      else
+        audio_bitrate=128
+      fi
+    fi
+  fi
+  [ "${a_max_bitrate}" -lt 0 ] && tdeEcho $return_message{5,6} && tdeError
+  str=$(echo -n "${audio_bitrate}" |sed 's/[0-9]//g')
+  if [ -z "${audio_bitrate}" -o -n "${str}" ]; then
+    tdeEcho $audio_start{1..3}
+    while read -p "$PS3" input
+    do
+      str=$(echo -n "${input}" |sed 's/[0-9]//g')
+      [ -z "${input}" -o -n "${str}" ] && tdeEcho "${return_message2}" && continue
+      ret=$(tdeBc "${input} > ${a_max_bitrate}")
+      if [ "${ret}" -eq 1 ]; then
+        tdeEcho $return_message{3,4}
+        tdeEcho "${limit_message1}${a_max_bitrate}"
+        continue
+      fi
+      input=$(tdeMin "${input}" "${n_a_limit_bitrate}")
+      if [ "${preset_type}" -eq 7 ]; then
+        ret=$((${s_v_bitrate} + ${input}))
+      else
+        ret=$((${total_bitrate} - ${input}))
+      fi
+      if [ "${ret}" -le 0 ]; then
+        tdeEcho $return_message{3,4}
+        continue
+      fi
+      audio_bitrate="${input}"
+      break
+    done
+  fi
+  if [ "${preset_type}" -eq 7 ]; then
+    video_bitrate="${s_v_bitrate}"
+    total_bitrate=$((${s_v_bitrate} + ${audio_bitrate}))
+  else
+    video_bitrate=$((${total_bitrate} - ${audio_bitrate}))
+  fi
+
+  # audio samplingrate
+  case "${audio_samplingrate}" in
+    [1-4]) ;;
+    *)
+      tdeEcho $samplingrate_start{1,2}
+      select item in $samplingrate_list{1..4}"Hz"
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        audio_samplingrate="${REPLY}"
+        break
+      done
+      ;;
+  esac
+  case "${audio_samplingrate}" in
+    2)
+      samplingrate_value="${samplingrate_list2}"
+      ;;
+    3)
+      samplingrate_value="${samplingrate_list3}"
+      ;;
+    4)
+      samplingrate_value="0"
+      ;;
+    *)
+      samplingrate_value="${samplingrate_list1}"
+      ;;
+  esac
+
+  # confirm
+  case "${skip_mode}" in
+    1)
+      ;;
+    *)
+      local confirm_preset0="preset_list${preset_type}"
+      local confirm_account0="confirm_account${account_type}"
+      local confirm_player0="confirm_player${flash_type}"
+      local confirm_dectype0="confirm_${dec_type}"
+      local confirm_deint0="confirm_deint${video_deint}"
+      if [ "${audio_bitrate}" -eq 0 ]; then
+        local confirm_audio0="${confirm_no_audio}"
+      else
+        local confirm_audio0="${audio_bitrate}kbps"
+      fi
+      if [ "${crf_enc}" -eq 2 ]; then
+        local confirm_crf0="${confirm_crf2}"
+        local confirm_t_bitrate0="${total_bitrate}kbps"
+      else
+        local confirm_crf0="${confirm_crf1}"
+        local confirm_t_bitrate0="${confirm_t_crf}"
+      fi
+      tdeEcho "${confirm_start}"
+      cat <<EOF >&2
+${confirm_preset} : ${!confirm_preset0}
+${confirm_account} : ${!confirm_account0}
+${confirm_player} : ${!confirm_player0}
+${confirm_dectype} : ${!confirm_dectype0}
+${confirm_crf} : ${confirm_crf0}
+${confirm_resize} : ${o_video_width}x${o_video_height}
+${confirm_deint} : ${!confirm_deint0}
+${confirm_audio} : ${confirm_audio0}
+${confirm_t_bitrate} : ${confirm_t_bitrate0}
+EOF
+      tdeEcho ${confirm_last1}
+      select item in $confirm_list{1,2}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        confirm_end="${REPLY}"
+        break
+      done
+      if [ "${confirm_end}" -eq 2 ]; then
+        tdeEcho "${confirm_last2}"
+        echo "r"
+        return
+      fi
+      ;;
+  esac
+  cat <<EOF
+    ${question_level:-2}
+    ${upload_site:-1}
+    ${preset_type:-2}
+    ${account_type:-1}
+    ${enc_type:-1}
+    ${crf_enc:-1}
+    ${dec_type:-2}
+    ${flash_type:-1}
+    ${video_deint:-1}
+    ${video_resize:-1}
+    ${total_time_sec:-0}
+    ${o_video_width:-0}
+    ${o_video_height:-0}
+    ${crf_value:-23}
+    ${video_bitrate:-1800}
+    ${audio_bitrate:-128}
+    ${audio_samplingrate:-1}
+    ${samplingrate_value:-44100}
+    ${limit_bitrate:-2000}
+EOF
+}
+# Usage: tdeVideoEncode "${input_video}"
+tdeVideoEncode()
+{
+  tdeEchoS "${video_enc_announce}"
+
+  # variables for video encoding
+  local use_ffmpeg=0
+  local x264_option=""
+  local ffmpeg_option="-y  -i $1 -an"
+
+  # bt709 for youtube, bt601 for niconico if flash_type >= 2
+  # otherwise choose by o_video_height
+  if [ "${out_matrix}" != "auto" ]; then
+    local out_matrix="${out_matrix}"
+  elif [ "${question_info[1]}" -eq 2 ]; then
+    local out_matrix="BT.709"
+  elif [ "${question_info[7]}" -ge 2 ]; then
+    local out_matrix="BT.601"
+  elif [ "${question_info[12]}" -ge 720 ]; then
+    local out_matrix="BT.709"
+  else
+    local out_matrix="BT.601"
+  fi
+  # use mediainfo for detect input colormatrix
+  # if there is no info, choose by the height of input video
+  if [ "${in_matrix}" != "auto" ]; then
+    local in_matrix="${in_matrix}"
+  else
+    local in_matrix=""
+    local matrix_info=$(${tool_mediainfo} "$1")
+    matrix_info=${matrix_info##*'Matrix coefficients'}
+    matrix_info=${matrix_info%%A*}
+    if $(echo ${matrix_info} | grep -iq 'BT.709'); then
+      in_matrix="BT.709"
+    elif $(echo ${matrix_info} | grep -iq 'BT.601'); then
+      in_matrix="BT.601"
+    elif [ ${video_info[4]} -ge 720 ]; then
+      in_matrix="BT.709"
+    else
+      in_matrix="BT.601"
+    fi
+  fi
+  # convert colormatrix if in_matrix != out_matrix
+
+  # define use_ffmpeg
+  # question_info[8] is video_deint
+  if [ "${question_info[8]}" -eq 2 -o "${video_info[7]}" != "Progressive" ]; then
+    use_ffmpeg=1
+    ffmpeg_option="${ffmpeg_option} -vf yadif"
+  fi
+  # fyi ffmpeg has colormatrix filter while libav doesnt
+  if [ "${in_matrix}" != "${out_matrix}" ]; then
+    use_ffmpeg=1
+    if [ "${in_matrix}" = "BT.601" ]; then
+      ffmpeg_option="${ffmpeg_option} -vf colormatrix=bt601:bt709"
+    else
+      ffmpeg_option="${ffmpeg_option} -vf colormatrix=bt709:bt601"
+    fi
+  fi
+
+  # define other options
+  case "${use_ffmpeg}" in
+    0)
+      # define x264 options
+      x264_option="$1 ${x264_common[*]}"
+      # question_info[2] is preset_type
+      if [ "${question_info[2]}" -lt 3 ]; then
+        x264_option="${x264_option} ${x264_anime[*]}"
+      elif [ "${question_info[2]}" -lt 6 ]; then
+        x264_option="${x264_option} ${x264_film[*]}"
+      fi
+      case "${question_info[2]}" in
+        1|4)
+          x264_pass="${pass_speed}"
+          x264_option="${x264_option} ${x264_low[*]}"
+          ;;
+        2|5)
+          x264_pass="${pass_balance}"
+          x264_option="${x264_option} ${x264_medium[*]}"
+          ;;
+        3|6)
+          x264_pass="${pass_quality}"
+          x264_option="${x264_option} ${x264_high[*]}"
+          ;;
+        7)
+          temp_264="$1"
+          return
+          ;;
+        8)
+          x264_pass="${pass_quality}"
+          x264_option="${x264_option} ${x264_user[*]}"
+          ;;
+        9)
+          x264_pass=0
+          ;;
+      esac
+      # economy mode for niconico
+      [ ${question_info[4]} -eq 2 ] && x264_option="${x264_option} ${x264_economy[*]}"
+      # fast decode for niconico
+      [ ${question_info[6]} -eq 1 ] && x264_option="${x264_option} ${x264_fast[*]}"
+      # avoid flash player problems
+      case ${question_info[7]} in
+        2)
+          x264_option="${x264_option} ${x264_flash1[*]}"
+          ;;
+        3)
+          x264_option="${x264_option} ${x264_flash1[*]} ${x264_flash2[*]}"
+          ;;
+      esac
+      if [ "${out_matrix}" = "BT.709" ]; then
+        x264_option="${x264_option} --colormatrix bt709"
+      else
+        x264_option="${x264_option} --colormatrix smpte170m"
+      fi
+      if [ "${full_range}" = "off" ]; then
+        x264_option="${x264_option} --range tv"
+      elif [ "${full_range}" = "on" ]; then
+        x264_option="${x264_option} --range pc"
+      else
+        x264_option="${x264_option} --range auto"
+      fi
+      # slightly reduce video bitrate
+      local x264_bitrate=$((${question_info[14]} - ${bitrate_margin}))
+      x264_option="${x264_option} -B ${x264_bitrate}"
+      # question_info[9] is video_resize
+      if [ "${question_info[9]}" -eq 1 -o "${question_info[9]}" -eq 3 ]; then
+        local resize_option="--vf resize:width=${question_info[11]},height=${question_info[12]}"
+        [ -z "${resize_method}" ] && resize_method="spline"
+        x264_option="${x264_option} ${resize_option},method=${resize_method}"
+      fi
+
+      # start video encoding
+      case "${x264_pass}" in
+        0)
+          local h264_size
+          local h264_bitrate
+          # question_info[5] is crf_enc
+          if [ "${question_info[5]}" -ne 2 ]; then
+            tdeEchoS "${pass_announce10}"
+            local x264_crf="--crf ${question_info[13]}"
+            ${tool_x264} ${x264_option} ${x264_crf} -o "${temp_264}"
+            if [ -s "${temp_264}" ]; then
+              # question_info[14] is video_bitrate
+              h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+              h264_bitrate=$((${h264_size} / ${video_info[0]}))
+              if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+                tdeEchoS "${video_enc_success}"
+                return
+              fi
+            else
+              tdeEchoS $video_enc_error{1,2}
+              tdeError
+            fi
+          fi
+          tdeEchoS "${pass_announce1}"
+          tdeEchoS "${pass_announce2}"
+          ${tool_x264} ${x264_option} -p 1 -o /dev/null
+          tdeEchoS "${pass_announce3}"
+          ${tool_x264} ${x264_option} -p 3 -o "${temp_264}"
+          # auto 3pass
+          if [ -s "${temp_264}" ]; then
+            h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+            h264_bitrate=$((${h264_size} / ${video_info[0]}))
+            if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+              tdeEchoS "${video_enc_success}"
+              return
+            fi
+          fi
+          tdeEcho $pass_announce{5,6}
+          tdeEchoS "${pass_announce6}"
+          ${tool_x264} ${x264_option} -p 2 -o "${temp_264}"
+          ;;
+        1)
+          tdeEchoS "${pass_announce7}"
+          tdeEchoS "${pass_announce2}"
+          ${tool_x264} ${x264_option} -o "${temp_264}"
+          ;;
+        2)
+          tdeEchoS "${pass_announce8}"
+          tdeEchoS "${pass_announce2}"
+          ${tool_x264} ${x264_option} -p 1 -o /dev/null
+          tdeEchoS "${pass_announce3}"
+          ${tool_x264} ${x264_option} -p 2 -o "${temp_264}"
+          ;;
+        3)
+          tdeEchoS "${pass_announce9}"
+          tdeEchoS "${pass_announce2}"
+          ${tool_x264} ${x264_option} -p 1 -o /dev/null
+          tdeEchoS "${pass_announce3}"
+          ${tool_x264} ${x264_option} -p 3 -o /dev/null
+          tdeEchoS "${pass_announce4}"
+          ${tool_x264} ${x264_option} -p 2 -o "${temp_264}"
+          ;;
+      esac
+      if [ -s "${temp_264}" ]; then
+        tdeEchoS "${video_enc_success}"
+      else
+        tdeEchoS $video_enc_error{1,2}
+        tdeError
+      fi
+      ;;
+    1)
+      local libx264_option="-vcodec libx264 -passlogfile ${temp_dir}/x264.log -x264opts"
+      # define libx264 options
+      # colormatrix
+      if [ "${out_matrix}" = "BT.709" ]; then
+        libx264_option="${libx264_option} colormatrix=bt709"
+      else
+        libx264_option="${libx264_option} colormatrix=smpte170m"
+      fi
+      for item in ${ffmpeg_common[@]}
+      do
+        libx264_option="${libx264_option}:${item}"
+      done
+      # question_info[2] is preset_type
+      if [ "${question_info[2]}" -lt 3 ]; then
+        for item in ${ffmpeg_anime[@]}
+        do
+          libx264_option="${libx264_option}:${item}"
+        done
+      elif [ "${question_info[2]}" -lt 6 ]; then
+        for item in ${ffmpeg_film[@]}
+        do
+          libx264_option="${libx264_option}:${item}"
+        done
+      fi
+      case "${question_info[2]}" in
+        1|4)
+          x264_pass="${pass_speed}"
+          for item in ${ffmpeg_low[@]}
+          do
+            libx264_option="${libx264_option}:${item}"
+          done
+          ;;
+        2|5)
+          x264_pass="${pass_balance}"
+          for item in ${ffmpeg_medium[@]}
+          do
+            libx264_option="${libx264_option}:${item}"
+          done
+          ;;
+        3|6)
+          x264_pass="${pass_quality}"
+          for item in ${ffmpeg_high[@]}
+          do
+            libx264_option="${libx264_option}:${item}"
+          done
+          ;;
+        7)
+          temp_264="$1"
+          return
+          ;;
+        8)
+          x264_pass="${pass_quality}"
+          for item in ${ffmpeg_user[@]}
+          do
+            libx264_option="${libx264_option}:${item}"
+          done
+          ;;
+        9)
+          x264_pass=0
+          ;;
+      esac
+      # economy mode for niconico
+      if [ ${question_info[4]} -eq 2 ]; then
+        for item in ${ffmpeg_economy[@]}
+        do
+          libx264_option="${libx264_option}:${item}"
+        done
+      fi
+      # fast decode for niconico
+      if [ ${question_info[6]} -eq 1 ]; then
+        for item in ${ffmpeg_fast[@]}
+        do
+          libx264_option="${libx264_option}:${item}"
+        done
+      fi
+      # avoid flash player problems
+      case ${question_info[7]} in
+        2)
+          ffmpeg_option="${ffmpeg_option} -flags -loop"
+          ;;
+        3)
+          ffmpeg_option="${ffmpeg_option} -flags -loop"
+          libx264_option="${libx264_option}:weightp=0"
+          ;;
+      esac
+      # slightly reduce video bitrate
+      local libx264_bitrate=$((${question_info[14]} - ${bitrate_margin}))
+
+      # define ffmpeg options
+      local i_width=${video_info[3]} o_width=${question_info[11]}
+      local i_height=${video_info[4]} o_height=${question_info[12]}
+      [ "$((${o_width} % 2))" -eq 1 ] && o_width=$((${o_width} + 1))
+      [ "$((${o_height} % 2))" -eq 1 ] && o_height=$((${o_height} + 1))
+      if [ "${o_width}" -ne "${i_width}" -o "${o_height}" -ne "${i_height}" ]; then
+        ffmpeg_option="${ffmpeg_option} -s ${o_width}x${o_height}"
+        [ -z "${resize_method}" ] && resize_method="spline"
+        ffmpeg_option="${ffmpeg_option} -sws_flags ${resize_method}"
+      fi
+
+      # start video encoding
+      case "${x264_pass}" in
+        0)
+          local h264_size
+          local h264_bitrate
+          # question_info[5] is crf_enc
+          if [ "${question_info[5]}" -ne 2 ]; then
+            tdeEchoS "${pass_announce10}"
+            local libx264_crf=":crf=${question_info[13]}"
+            ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option}${libx264_crf} "${temp_264}"
+            if [ -s "${temp_264}" ]; then
+              # question_info[14] is video_bitrate
+              h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+              h264_bitrate=$((${h264_size} / ${video_info[0]}))
+              if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+                tdeEchoS "${video_enc_success}"
+                return
+              fi
+            else
+              tdeEchoS $video_enc_error{1,2}
+              tdeError
+            fi
+          fi
+          tdeEchoS "${pass_announce1}"
+          tdeEchoS "${pass_announce2}"
+          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
+          tdeEchoS "${pass_announce3}"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
+          # auto 3pass
+          if [ -s "${temp_264}" ]; then
+            h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+            h264_bitrate=$((${h264_size} / ${video_info[0]}))
+            if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+              tdeEchoS "${video_enc_success}"
+              return
+            fi
+          fi
+          tdeEcho $pass_announce{5,6}
+          tdeEchoS "${pass_announce6}"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
+          ;;
+        1)
+          tdeEchoS "${pass_announce7}"
+          tdeEchoS "${pass_announce2}"
+          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} "${temp_264}"
+          ;;
+        2)
+          tdeEchoS "${pass_announce8}"
+          tdeEchoS "${pass_announce2}"
+          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
+          tdeEchoS "${pass_announce3}"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
+          ;;
+        3)
+          tdeEchoS "${pass_announce9}"
+          tdeEchoS "${pass_announce2}"
+          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
+          tdeEchoS "${pass_announce3}"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
+          tdeEchoS "${pass_announce4}"
+          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
+          ;;
+      esac
+      if [ -s "${temp_264}" ]; then
+        tdeEchoS "${video_enc_success}"
+      else
+        tdeEchoS $video_enc_error{1,2}
+        tdeError
+      fi
+      ;;
+  esac
+}
+# Usage: tdeAudioEncode "${input_audio}"
+tdeAudioEncode()
+{
+  tdeEchoS "${audio_enc_announce}"
+
+  # variables for audio encoder
+  local aac_option
+  local ffmpeg_aac="-vn -y -acodec aac -strict -2"
+  local ffmpeg_pcm="-vn -y -acodec pcm_s16le"
+
+  # silent
+  if [ "${question_info[15]}" -eq 0 -o "${audio_info[0]}" -eq 0 ]; then
+    ffmpeg_pcm="${ffmpeg_pcm} -ar 44100 -f s16le"
+    ffmpeg_aac="-profile aac_he ${ffmpeg_aac} -ab 48k"
+    ${tool_ffmpeg} ${ffmpeg_pcm} -i /dev/zero ${ffmpeg_aac} -t 1 "${temp_m4a}"
+    return
+  fi
+
+  # define audio options
+  local a_bitrate="${question_info[15]}"
+  # define aac profile
+  local aac_profile
+  local audio_surround
+  [ "${audio_info[3]}" -le 2 ] && audio_surround=1 || audio_surround=2
+  if [ "${a_bitrate}" -le $((32 * ${audio_surround})) ]; then
+    [ "${audio_info[3]}" -eq 2 ] && aac_profile="hev2" || aac_profile="he"
+  elif [ "${a_bitrate}" -le $((96 * ${audio_surround})) ]; then
+    aac_profile="he"
+  else
+    aac_profile="lc"
+  fi
+  if $(echo ${tool_aacEnc} | grep -iq 'afconvert'); then
+    local apple_profile
+    if [ "${aac_profile}" = "hev2" ]; then
+      apple_profile="aacp"
+    elif [ "${aac_profile}" = "he" ]; then
+      apple_profile="aach"
+    else
+      apple_profile="aac"
+    fi
+    aac_option="-v -b ${a_bitrate}000 -s 2 -f m4af -d ${apple_profile}"
+  elif $(echo ${tool_aacEnc} | grep -iq 'neroAacEnc'); then
+    aac_option="-2pass -br ${a_bitrate}000"
+  else
+    local ffmpeg_profile
+    if [ "${aac_profile}" = "hev2" ]; then
+      ffmpeg_profile="aac_he_v2"
+    elif [ "${aac_profile}" = "he" ]; then
+      ffmpeg_profile="aac_he"
+    else
+      ffmpeg_profile="aac_low"
+    fi
+    aac_option="-profile ${ffmpeg_profile} ${ffmpeg_aac} -ab ${a_bitrate}k"
+    if [ "${a_bitrate}" -lt $((128 * ${audio_surround})) ]; then
+      cutoff_value=16000
+    elif [ "${a_bitrate}" -lt $((224 * ${audio_surround})) ]; then
+      cutoff_value=18000
+    else
+      cutoff_value=20000
+    fi
+    aac_option="${aac_option} -cutoff ${cutoff_value}"
+  fi
+  [ "${question_info[17]}" -ne 0 ] && local ffmpeg_samplingrate="-ar ${question_info[17]}"
+
+  # skip audio encoding if the audio format is AAC and the bitrate is low enough
+  local audio_codec=$(tdeMediaInfo -a Format "%1")
+  if $(echo "${audio_codec}" | grep -iq 'AAC'); then
+    local h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+    local h264_bitrate=$((${h264_size} / ${video_info[0]}))
+    local a_limit_bitrate=$((${question_info[18]} - ${h264_bitrate}))
+    if [ "${audio_info[1]}" -lt "${a_limit_bitrate}" ]; then
+      temp_m4a="$1"
+      return
+    fi
+  fi
+
+  # start audio encoding
+  if $(echo ${tool_aacEnc} | grep -iq 'afconvert'); then
+    # afconvert accepts some audio formats
+    if [ -n "${audio_ext}" -a "${audio_info[2]}" -le 48000 ]; then
+      ${tool_aacEnc} ${aac_option} "$1" "${temp_m4a}"
+    else
+      tdeEchoS ${audio_wav_announce}
+      ${tool_ffmpeg} -loglevel quiet -i "$1" ${ffmpeg_pcm} ${ffmpeg_samplingrate} "${temp_wav}"
+      ${tool_aacEnc} ${aac_option} "${temp_wav}" "${temp_m4a}"
+    fi
+  elif $(echo ${tool_aacEnc} | grep -iq 'neroAacEnc'); then
+    # neroAacEnc accepts WAVE
+    if [ "${audio_ext}" = "wav" -a "${audio_info[2]}" -le 48000 ]; then
+      ${tool_aacEnc} ${aac_option} -if "$1" -of "${temp_m4a}"
+    else
+      tdeEchoS ${audio_wav_announce}
+      ${tool_ffmpeg} -loglevel quiet -i "$1" ${ffmpeg_pcm} ${ffmpeg_samplingrate} "${temp_wav}"
+      ${tool_aacEnc} ${aac_option} -if "${temp_wav}" -of "${temp_m4a}"
+    fi
+  else
+    # ffmpeg accepts a lot of audio formats
+    ${tool_aacEnc} -i "$1" ${aac_option} ${ffmpeg_samplingrate} "${temp_m4a}"
+  fi
+
+  # check if audio encoding succeeded
+  if [ -s "${temp_m4a}" ]; then
+    tdeEchoS "${audio_enc_success}"
+  else
+    tdeEchoS $audio_enc_error{1,2}
+    tdeError
+  fi
+}
+# Usage: tdeMux
+tdeMux()
+{
+  tdeEchoS "${mp4_announce}"
+
+  # start muxing
+  [ "${question_info[2]}" -eq 7 ] || mp4_fps="-fps ${video_info[2]}"
+  ${tool_MP4Box} ${mp4_fps} -add "${temp_264}#video" -add "${temp_m4a}#audio" -new "${temp_mp4}"
+
+  # backup
+  [ -e "${output_mp4name}" ] && mv "${output_mp4name}" "${mp4_dir}/old.mp4"
+  mv "${temp_mp4}" "${output_mp4name}" >/dev/null 2>&1
+
+  # check if muxing succeeded
+  if [ -s "${output_mp4name}" ]; then
+    tdeEchoS "${mp4_success}"
+  else
+    tdeEchoS $mp4_error{1,2}
+    tdeError
+  fi
+
+  #TODO: check file size
+  tdeShowInfo "${output_mp4name}"
+}
+# Usage: tdeEnc2mp4 "${input_video}" "${input_audio}"
+tdeEnc2mp4()
+{
+  while :
+  do
+    question_info=($(tdeAskQuestion))
+    [ "${question_info}" = "r" ] && continue
+    [ "${#question_info[*]}" -eq 19 ] && break || exit
+  done
+  tdeVideoEncode "$1"
+  tdeAudioEncode "$2"
+  tdeMux
+}
+# Usage: tdeSerialMode "${input_video}"
+tdeSerialMode()
+{
+  tdeEcho $analyze_announce{1,2}
+  tdeShowInfo "$1"
+  video_info=($(tdeVideoInfo "$1"))
+  audio_info=($(tdeAudioInfo "$1"))
+  if [ "${video_info[0]}" -eq 0 -o "${video_info[3]}" -eq 0 ]; then
+    tdeEcho $analyze_error{1..3}
+    tdeError
+  fi
+  tdeEnc2mp4 "$1" "$1"
+}
+# Usage: tdeMuxMode "${input_video}" "${input_audio}"
+tdeMuxMode()
+{
+  tdeEcho $analyze_announce{1,2}
+  tdeShowInfo "$1" "$2"
+  video_info=($(tdeVideoInfo "$1"))
+  audio_info=($(tdeAudioInfo "$2"))
+  if [ "${video_info[0]}" -eq 0 -o "${video_info[3]}" -eq 0 -o "${audio_info[3]}" -eq 0 ]; then
+    tdeEcho analyze_error{1..3}
+    tdeError
+  fi
+  tdeEnc2mp4 "$1" "$2"
+}
+
+
+####################################################################################################
+# Start TDEnc2
+####################################################################################################
+trap "tdeHander" INT
+# os
+# might run on other platforms, i dont care though :p
+if [ $(uname) = "Darwin" ]; then
+  os="Mac"
+elif [ $(uname) = "Linux" ]; then
+  os="Linux"
+elif [ $(uname -o) = "Cygwin" -o $(uname -o) = "Msys" ]; then
+  os="Windows"
+else
+  tdeEcho $platform_start{1..3}
+  select item in $platform_list{1,2}
+  do
+    [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+    platform="${REPLY}"
+    break
+  done
+  case "${platform}" in
+    2)
+      tdeError
+      ;;
+  esac
+fi
+
+# print version info
+clear
+echo "${color_green}+${color_blue}---------------------------${color_green}+"
+echo "${color_blue}| ${color_purple}TDEnc2 for Bash (ver${current_version}) ${color_blue}|"
+echo "${color_green}+${color_blue}---------------------------${color_green}+${color_reset}"
+
+# check updates. not auto-updating yet. sry
+latest_version=$(curl -s "http://tdenc.com/files/TDEnc2/latest_version")
+[ -z "${latest_version}" ] && latest_version=${current_version}
+need_update=$(tdeBc "${latest_version} > ${current_version}")
+if [ "${need_update}" -eq 1 ]; then
+  tdeEcho $update_start{1..3}
+  cat <<EOF
+ $update_start4
+ ${short_line}
+$(curl -s "http://tdenc.com/files/TDEnc2/ChangeLog")
+ ${short_line}
+
+EOF
+  select item in $update_list{1..3}
+  do
+    [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+    update="${REPLY}"
+    break
+  done
+  case "${update}" in
+    1)
+      tdeError
+      ;;
+    3)
+      echo "${latest_version}" > "${ver_txt}"
+      ;;
+  esac
+fi
+
+# auto-install tools
+if [ ! \( -e ${tool_ffmpeg} -a -e ${tool_x264} -a -e ${tool_MP4Box} -a -e ${tool_mediainfo} \) ]; then
+  tdeEcho $auto_install_start{1,2}
+  if [ "$os" = "Mac" ]; then
+    # for mac
+    curl -O "http://tdenc.com/files/TDEnc2/Mac.zip"
+    if [ "$?" -eq 0 ]; then
+      tdeEchoS "${auto_install_end}"
+    else
+      tdeEcho $auto_install_error{1,2}
+      tdeError
+    fi
+    unzip -qjo Mac.zip 2>/dev/null
+    rm Mac.zip
+    # TODO: for linux and windows
+  fi
+  chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
+fi
+
+# check tools, `which $tool` if necessary
+./${tool_ffmpeg} -h >/dev/null 2>&1
+if [ "$?" -eq 0 ]; then
+  tool_ffmpeg="./${tool_ffmpeg}"
+else
+  tool_ffmpeg=$(which ${tool_ffmpeg} 2>/dev/null)
+  [ -z "${tool_ffmpeg}" ] && tdeEcho $tool_error{1,2} && tdeError
+fi
+./${tool_x264} -h >/dev/null 2>&1
+if [ "$?" -eq 0 ]; then
+  tool_x264="./${tool_x264}"
+else
+  tool_x264=$(which ${tool_x264} 2>/dev/null)
+  [ -z "${tool_x264}" ] && tdeEcho $tool_error{1,2} && tdeError
+fi
+./${tool_MP4Box} -h >/dev/null 2>&1
+if [ "$?" -eq 0 ]; then
+  tool_MP4Box="./${tool_MP4Box}"
+else
+  tool_MP4Box=$(which ${tool_MP4Box} 2>/dev/null)
+  [ -z "${tool_MP4Box}" ] && tdeEcho $tool_error{1,2} && tdeError
+fi
+mediainfo_check=($(./${tool_mediainfo} --version 2>/dev/null))
+if [ "${mediainfo_check}" = "MediaInfo" ]; then
+  tool_mediainfo="./${tool_mediainfo}"
+else
+  tool_mediainfo=$(which ${tool_mediainfo} 2>/dev/null)
+  [ -z "${tool_mediainfo}" ] && tdeEcho $tool_error{1,2} && tdeError
+fi
+if [ "$os" = "Mac" ]; then
+  [ "${mac_aacEnc}" = "afconvert" ] && tool_aacEnc=$(which afconvert) || tool_aacEnc=${tool_ffmpeg}
+elif [ "$os" = "Linux" ]; then
+  ./${linux_aacEnc} -help >/dev/null 2>&1
+  [ "$?" -eq 0 ] && tool_aacEnc="./${linux_aacEnc}" || tool_aacEnc=${tool_ffmpeg}
+elif [ "$os" = "Windows" ]; then
+  ./${win_aacEnc} -help >/dev/null 2>&1
+  [ "$?" -eq 0 ] && tool_aacEnc="./${win_aacEnc}" || tool_aacEnc=${tool_ffmpeg}
+fi
+
+# check arguments, and go to main proccess
+# use symbolic links to avoid white space problems
+case "$#" in
+  0)
+    tdeEcho "${doubleclick_alert1}" "${doubleclick_alert2}"
+    tdeError
+    ;;
+  1)
+    tdeEcho "${one_movie_announce}"
+    tdenc_mode=1
+    source_video="$(cd $(dirname "$1") && pwd)/$(basename "$1")"
+    output_basename="${source_video##*/}"
+    output_mp4name="${mp4_dir}/${output_basename%.*}.mp4"
+    input_video="${temp_dir}/source.${1##*.}"
+    ln -s "${source_video}" "${input_video}"
+    tdeSerialMode "${input_video}"
+    tdeEcho $dere_message{1,2}
+    tdeSuccess
+    ;;
+  2)
+    first_ext=$(echo "${1##*.}" | tr [:upper:] [:lower:])
+    second_ext=$(echo "${2##*.}" | tr [:upper:] [:lower:])
+    audio_array=()
+    audio_pattern="wave?|mp3|aif+"
+    if [[ ${first_ext} =~ ${audio_pattern} ]]; then
+      audio_array=("${audio_array[@]}" "$1")
+      audio_ext="${first_ext}"
+      shift
+    fi
+    if [[ ${second_ext} =~ ${audio_pattern} ]]; then
+      audio_array=("${audio_array[@]}" "$2")
+      audio_ext="${second_ext}"
+    fi
+    case "${#audio_array[*]}" in
+      0)
+        tdeEcho "${sequence_announce}"
+        tdenc_mode=3
+        for item in "$@"
+        do
+          source_video="$(cd $(dirname "${item}") && pwd)/$(basename "${item}")"
+          output_basename="${source_video##*/}"
+          output_mp4name="${mp4_dir}/${output_basename%.*}.mp4"
+          input_video="${temp_dir}/source.${item##*.}"
+          ln -s "${source_video}" "${input_video}"
+          tdeSerialMode "${input_video}"
+          rm "${input_video}"
+        done
+        tdeEcho $sequence_end{1..3}
+        tdeSuccess
+        ;;
+      1)
+        tdeEcho "${mux_announce}"
+        tdenc_mode=2
+        source_video="$(cd $(dirname "$1") && pwd)/$(basename "$1")"
+        source_audio="$(cd $(dirname "${audio_array}") && pwd)/$(basename "${audio_array}")"
+        output_basename="${source_video##*/}"
+        output_mp4name="${mp4_dir}/${output_basename%.*}.mp4"
+        video_ext=$(echo "${1##*.}" | tr [:upper:] [:lower:])
+        input_video="${temp_dir}/source.${video_ext}"
+        input_audio="${temp_dir}/source.${audio_ext}"
+        ln -s "${source_video}" "${input_video}"
+        ln -s "${source_audio}" "${input_audio}"
+        tdeMuxMode "${input_video}" "${input_audio}"
+        tdeEcho $dere_message{1,2}
+        tdeSuccess
+        ;;
+      2)
+        tdeEcho "${muxmode_error}"
+        tdeError
+        ;;
+    esac
+    ;;
+  *)
+    tdeEcho "${sequence_announce}"
+    tdenc_mode=3
+    for item in "$@"
+    do
+      source_video="$(cd $(dirname "${item}") && pwd)/$(basename "${item}")"
+      output_basename="${source_video##*/}"
+      output_mp4name="${mp4_dir}/${output_basename%.*}.mp4"
+      input_video="${temp_dir}/source.${item##*.}"
+      ln -s "${source_video}" "${input_video}"
+      tdeSerialMode "${input_video}"
+      rm "${input_video}"
+    done
+    tdeEcho $sequence_end{1..3}
+    tdeSuccess
+    ;;
+esac
+
+# end of file. hehehe.
