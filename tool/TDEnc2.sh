@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.00"
+current_version="2.01"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -399,7 +399,7 @@ tdeAskQuestion()
       select item in $economy_list{1,2}
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
-        eco_type="${REPLY}"
+        enc_type="${REPLY}"
         break
       done
       ;;
