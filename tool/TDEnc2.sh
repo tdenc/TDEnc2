@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.01"
+current_version="2.02"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -1135,7 +1135,7 @@ tdeAudioEncode()
   [ "${audio_info[3]}" -le 2 ] && audio_surround=1 || audio_surround=2
   if [ "${a_bitrate}" -le $((32 * ${audio_surround})) ]; then
     [ "${audio_info[3]}" -eq 2 ] && aac_profile="hev2" || aac_profile="he"
-  elif [ "${a_bitrate}" -le $((96 * ${audio_surround})) ]; then
+  elif [ "${a_bitrate}" -le $((64 * ${audio_surround})) ]; then
     aac_profile="he"
   else
     aac_profile="lc"
