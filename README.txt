@@ -40,7 +40,7 @@
 
     FFmpeg,FFmpegSource,x264,MediaInfo,GPACを作成してくださった皆様(頭が上がりません)
     リリース前にテストしてくださった以下の方々（一人でバグ取りは無理でした）
-      Co氏、Ne氏、La氏、Pi氏、Wh氏、Ta氏、Sa氏、To氏、Ko氏
+      Co氏、Ne氏、La氏、Pi氏、Wh氏、Ta氏、Sa氏、To氏、Ko氏、Ri氏
     つんでれんこ/TDEnc2を使ってくださっている皆様(ユーザーがいなきゃ作っている意味がないです)
 
 
