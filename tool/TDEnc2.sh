@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.02"
+current_version="2.03"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -1412,7 +1412,7 @@ case "$#" in
   1)
     tdeEcho "${one_movie_announce}"
     tdenc_mode=1
-    source_video="$(cd $(dirname "$1") && pwd)/$(basename "$1")"
+    source_video="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
     output_basename="${source_video##*/}"
     output_mp4name="${mp4_dir}/${output_basename%.*}.mp4"
     input_video="${temp_dir}/source.${1##*.}"
