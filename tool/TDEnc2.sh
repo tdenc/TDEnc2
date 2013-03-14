@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.03"
+current_version="2.04"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -15,7 +15,7 @@ temp_wav="${temp_dir}/audio.wav"
 temp_m4a="${temp_dir}/audio.m4a"
 temp_mp4="${temp_dir}/movie.mp4"
 ver_txt="current_version"
-mkdir -p "${temp_dir}"  >/dev/null 2>&1
+mkdir -p "${temp_dir}" >/dev/null 2>&1
 [ -d "${mp4_dir}" ] || mkdir -p "${mp4_dir}" >/dev/null 2>&1
 [ -s "${ver_txt}" ] && current_version=$(cat "${ver_txt}")
 # read user settings
@@ -1336,6 +1336,7 @@ EOF
   done
   case "${update}" in
     1)
+      rm -f "${ver_txt}" >/dev/null 2>&1
       tdeError
       ;;
     3)
