@@ -15,6 +15,8 @@ temp_wav="${temp_dir}/audio.wav"
 temp_m4a="${temp_dir}/audio.m4a"
 temp_mp4="${temp_dir}/movie.mp4"
 ver_txt="current_version"
+mkdir -p "${temp_dir}"  >/dev/null 2>&1
+[ -d "${mp4_dir}" ] || mkdir -p "${mp4_dir}" >/dev/null 2>&1
 [ -s "${ver_txt}" ] && current_version=$(cat "${ver_txt}")
 # read user settings
 # edit message.conf to use TDEnc2 in your native language :)
@@ -23,10 +25,8 @@ ver_txt="current_version"
 . "../setting/user_setting.conf"
 . "../setting/x264_option.conf"
 . "../setting/ffmpeg_option.conf"
-mkdir -p "${temp_dir}"
-[ -d "${mp4_dir}" ] || mkdir "${mp4_dir}"
 # escape sequence
-if $(echo ${TERM} | grep -iq 'xterm'); then
+if $(echo "${TERM}" | grep -iq 'xterm'); then
   color_green=$'\e[32m'
   color_blue=$'\e[34m'
   color_red=$'\e[31m'
@@ -48,16 +48,16 @@ PS3=">> "
 ####################################################################################################
 # i wish i could use bash 4 for associative arrays...
 # question_info    = (
-#              [0]    question_level      : 1-3 ( 1:easy, 3:difficult )
-#              [1]    upload_site         : 1-2 ( 1:niconico, 2:youtube )
+#              [0]    question_type      : 1-3 ( 1:easy, 3:difficult )
+#              [1]    site_type         : 1-2 ( 1:niconico, 2:youtube )
 #              [2]    preset_type         : 1-9 ( 7:sing, 8:user-preset ,9:youtube )
 #              [3]    account_type        : 1-2 ( 1:premium, 2:normal )
 #              [4]    enc_type            : 1-2 ( 1:high, 2:economy )
-#              [5]    crf_enc             : 1-2 ( 1:auto, 2:no, 3:manual )
+#              [5]    crf_type             : 1-3 ( 1:auto, 2:no, 3:manual )
 #              [6]    dec_type            : 1-2 ( 1:fast, 2:normal )
 #              [7]    flash_type          : 1-3 ( 1:normal, 3:strict )
-#              [8]    video_deint         : 1-2 ( 1:auto, 2:no, 3:force )
-#              [9]    video_resize        : 1-2 ( 1:auto, 2:no, 3:manual )
+#              [8]    deint_type         : 1-2 ( 1:auto, 2:no, 3:force )
+#              [9]    resize_type        : 1-2 ( 1:auto, 2:no, 3:manual )
 #              [10]   total_time_sec      : int
 #              [11]   o_video_width       : int
 #              [12]   o_video_height      : int
@@ -225,18 +225,18 @@ fi
 tdeAskQuestion()
 {
   # define local variables
-  local question_level="${question_level}"
-  local upload_site="${upload_site}"
+  local question_type="${question_type}"
+  local site_type="${site_type}"
   local preset_type="${preset_type}"
   local account_type="${account_type}"
   local enc_type="${enc_type}"
   local total_bitrate="${total_bitrate}"
-  local crf_enc="${crf_enc}"
+  local crf_type="${crf_type}"
   local crf_value="${crf_value}"
   local dec_type="${dec_type}"
   local flash_type="${flash_type}"
-  local video_deint="${video_deint}"
-  local video_resize="${video_resize}"
+  local deint_type="${deint_type}"
+  local resize_type="${resize_type}"
   local resize_value="${resize_value}"
   local audio_bitrate="${audio_bitrate}"
   local audio_samplingrate="${audio_samplingrate}"
@@ -279,52 +279,52 @@ tdeAskQuestion()
   tdeEcho $question_start{1,2}
 
   # question level
-  case "${question_level}" in
+  case "${question_type}" in
     1|2|3) ;;
     *)
       tdeEcho $level_start{1..3}
       select item in $level_list{1..3}
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
-        question_level="${REPLY}"
+        question_type="${REPLY}"
         break
       done
       ;;
   esac
-  if [ "${question_level}" -le 2 ]; then
-    crf_enc=1
+  if [ "${question_type}" -le 2 ]; then
+    crf_type=1
     enc_type=1
     dec_type=2
-    video_deint=1
+    deint_type=1
     audio_samplingrate=1
-    if [ "${question_level}" -eq 1 ]; then
+    if [ "${question_type}" -eq 1 ]; then
       preset_type=2
       total_bitrate=0
       flash_type=1
-      video_resize=1
+      resize_type=1
     fi
   fi
 
   # upload site
-  case "${upload_site}" in
+  case "${site_type}" in
     1|2) ;;
     *)
-      tdeEcho "${upload_site_start}"
+      tdeEcho "${site_type_start}"
       select item in "NicoNico" "YouTube"
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
-        upload_site="${REPLY}"
+        site_type="${REPLY}"
         break
       done
       ;;
   esac
-  if [ "${upload_site}" -eq 2 ]; then
+  if [ "${site_type}" -eq 2 ]; then
     preset_type=9
     audio_samplingrate=2
     enc_type=1
-    crf_enc=1
+    crf_type=1
     dec_type=2
-    video_resize=2
+    resize_type=2
     flash_type=1
   fi
 
@@ -344,14 +344,14 @@ tdeAskQuestion()
   esac
   case "${preset_type}" in
     1|4)
-      crf_enc=2
+      crf_type=2
       ;;
     7)
-      crf_enc=2
-      video_deint=3
+      crf_type=2
+      deint_type=3
       flash_type=1
       dec_type=2
-      video_resize=2
+      resize_type=2
       total_bitrate="${p_temp_bitrate}"
       ;;
     8)
@@ -414,7 +414,7 @@ tdeAskQuestion()
   fi
 
   # total bitrate
-  if [ "${upload_site}" -eq 2 ]; then
+  if [ "${site_type}" -eq 2 ]; then
     if [ "${account_type}" -eq 1 ]; then
       total_bitrate="${y_p_temp_bitrate}"
       limit_bitrate="${y_p_temp_bitrate}"
@@ -451,23 +451,23 @@ tdeAskQuestion()
   fi
 
   # crf encode
-  [ "${total_bitrate}" -lt "${bitrate_threshold}" ] && crf_enc=2
-  [ -n "${crf_value}" ] && crf_enc=3
-  case "${crf_enc}" in
+  [ "${total_bitrate}" -lt "${bitrate_threshold}" ] && crf_type=2
+  [ -n "${crf_value}" ] && crf_type=3
+  case "${crf_type}" in
     [1-3]) ;;
     *)
       tdeEcho $br_mode_start{1..4}
       select item in $br_mode_list{1..3}
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
-        crf_enc="${REPLY}"
+        crf_type="${REPLY}"
         break
       done
       ;;
   esac
-  case "${crf_enc}" in
+  case "${crf_type}" in
     1)
-      if [ "${upload_site}" -eq 2 ]; then
+      if [ "${site_type}" -eq 2 ]; then
         crf_value="${crf_you}"
       elif [ "${account_type}" -eq 1 ]; then
         crf_value="${crf_high}"
@@ -523,36 +523,36 @@ tdeAskQuestion()
   esac
 
   # deinterlace
-  case "${video_deint}" in
+  case "${deint_type}" in
     [1-3]) ;;
     *)
       tdeEcho $deint_start1
       select item in $deint_list{1..3}
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
-        video_deint="${REPLY}"
+        deint_type="${REPLY}"
         break
       done
       ;;
   esac
 
   # video resize
-  case "${video_resize}" in
+  case "${resize_type}" in
     [1-3]) ;;
     *)
       tdeEcho $resize_start{1..3}
       select item in $resize_list{1..3}
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
-        video_resize="${REPLY}"
+        resize_type="${REPLY}"
         break
       done
       ;;
   esac
-  if [ "${video_resize}" -eq 2 ]; then
+  if [ "${resize_type}" -eq 2 ]; then
     o_video_width="${i_video_width}"
     o_video_height="${i_video_height}"
-  elif [ "${video_resize}" -eq 3 ]; then
+  elif [ "${resize_type}" -eq 3 ]; then
     while [ -z "${resize_value}" ]
     do
       tdeEcho ${resize_value_start}
@@ -573,7 +573,7 @@ tdeAskQuestion()
       done
     done
   fi
-  if [ "${upload_site}" -eq 1 -a "${account_type}" -eq 2 ]; then
+  if [ "${site_type}" -eq 1 -a "${account_type}" -eq 2 ]; then
     if [ "${o_video_width}" -gt "${i_max_width}" -o "${o_video_height}" -gt "${i_max_height}" ]; then
       [ "${preset_type}" -eq 7 ] && tdeEcho $return_message{8,9} || tdeEcho $return_message{10,11}
       tdeError
@@ -585,13 +585,13 @@ tdeAskQuestion()
     a_max_bitrate=$((${total_bitrate} - ${s_v_bitrate}))
   else
     a_max_bitrate=${total_bitrate}
-    if [ "${upload_site}" -eq 2 ]; then
+    if [ "${site_type}" -eq 2 ]; then
       if [ "${audio_info[3]}" -eq 2 ]; then
         audio_bitrate="${y_stereo_bitrate}"
       else
         audio_bitrate="${y_surround_bitrate}"
       fi
-    elif [ "${question_level}" -eq 1 ]; then
+    elif [ "${question_type}" -eq 1 ]; then
       if [ "${account_type}" -eq 1 ]; then
         audio_bitrate=192
       else
@@ -671,13 +671,13 @@ tdeAskQuestion()
       local confirm_account0="confirm_account${account_type}"
       local confirm_player0="confirm_player${flash_type}"
       local confirm_dectype0="confirm_${dec_type}"
-      local confirm_deint0="confirm_deint${video_deint}"
+      local confirm_deint0="confirm_deint${deint_type}"
       if [ "${audio_bitrate}" -eq 0 ]; then
         local confirm_audio0="${confirm_no_audio}"
       else
         local confirm_audio0="${audio_bitrate}kbps"
       fi
-      if [ "${crf_enc}" -eq 2 ]; then
+      if [ "${crf_type}" -eq 2 ]; then
         local confirm_crf0="${confirm_crf2}"
         local confirm_t_bitrate0="${total_bitrate}kbps"
       else
@@ -711,16 +711,16 @@ EOF
       ;;
   esac
   cat <<EOF
-    ${question_level:-2}
-    ${upload_site:-1}
+    ${question_type:-2}
+    ${site_type:-1}
     ${preset_type:-2}
     ${account_type:-1}
     ${enc_type:-1}
-    ${crf_enc:-1}
+    ${crf_type:-1}
     ${dec_type:-2}
     ${flash_type:-1}
-    ${video_deint:-1}
-    ${video_resize:-1}
+    ${deint_type:-1}
+    ${resize_type:-1}
     ${total_time_sec:-0}
     ${o_video_width:-0}
     ${o_video_height:-0}
@@ -777,7 +777,7 @@ tdeVideoEncode()
   # convert colormatrix if in_matrix != out_matrix
 
   # define use_ffmpeg
-  # question_info[8] is video_deint
+  # question_info[8] is deint_type
   if [ "${question_info[8]}" -eq 2 -o "${video_info[7]}" != "Progressive" ]; then
     use_ffmpeg=1
     ffmpeg_option="${ffmpeg_option} -vf yadif"
@@ -856,7 +856,7 @@ tdeVideoEncode()
       # slightly reduce video bitrate
       local x264_bitrate=$((${question_info[14]} - ${bitrate_margin}))
       x264_option="${x264_option} -B ${x264_bitrate}"
-      # question_info[9] is video_resize
+      # question_info[9] is resize_type
       if [ "${question_info[9]}" -eq 1 -o "${question_info[9]}" -eq 3 ]; then
         local resize_option="--vf resize:width=${question_info[11]},height=${question_info[12]}"
         [ -z "${resize_method}" ] && resize_method="spline"
@@ -868,7 +868,7 @@ tdeVideoEncode()
         0)
           local h264_size
           local h264_bitrate
-          # question_info[5] is crf_enc
+          # question_info[5] is crf_type
           if [ "${question_info[5]}" -ne 2 ]; then
             tdeEchoS "${pass_announce10}"
             local x264_crf="--crf ${question_info[13]}"
@@ -1038,7 +1038,7 @@ tdeVideoEncode()
         0)
           local h264_size
           local h264_bitrate
-          # question_info[5] is crf_enc
+          # question_info[5] is crf_type
           if [ "${question_info[5]}" -ne 2 ]; then
             tdeEchoS "${pass_announce10}"
             local libx264_crf=":crf=${question_info[13]}"
