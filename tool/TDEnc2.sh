@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.04"
+current_version="2.05"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -1394,13 +1394,34 @@ else
   [ -z "${tool_mediainfo}" ] && tdeEcho $tool_error{1,2} && tdeError
 fi
 if [ "${os}" = "Mac" ]; then
-  [ "${mac_aacEnc}" = "afconvert" ] && tool_aacEnc=$(which afconvert) || tool_aacEnc=${tool_ffmpeg}
+  if [ "${mac_aacEnc}" = "afconvert" ]; then
+    tool_aacEnc=$(which afconvert 2>/dev/null)
+  else
+    ./${mac_aacEnc} -h >/dev/null 2>&1
+    if [ "$?" -eq 0 ]; then
+      tool_aacEnc="./${mac_aacEnc}"
+    else
+      tool_aacEnc=$(which ${mac_aacEnc} 2>/dev/null)
+    fi
+  fi
 elif [ "${os}" = "Linux" ]; then
   ./${linux_aacEnc} -help >/dev/null 2>&1
-  [ "$?" -eq 0 ] && tool_aacEnc="./${linux_aacEnc}" || tool_aacEnc=${tool_ffmpeg}
+  if [ "$?" -eq 0 ]; then
+    tool_aacEnc="./${linux_aacEnc}"
+  else
+    tool_aacEnc=$(which ${linux_aacEnc} 2>/dev/null)
+  fi
 elif [ "${os}" = "Windows" ]; then
   ./${win_aacEnc} -help >/dev/null 2>&1
-  [ "$?" -eq 0 ] && tool_aacEnc="./${win_aacEnc}" || tool_aacEnc=${tool_ffmpeg}
+  if [ "$?" -eq 0 ]; then
+    tool_aacEnc="./${win_aacEnc}"
+  else
+    tool_aacEnc=$(which ${win_aacEnc} 2>/dev/null)
+  fi
+fi
+if [ -z "${tool_aacEnc}" ]; then
+  [ "${os}" = "Mac" ] && tdeEcho $tool_aac_warning{1,3} || tdeEcho $tool_aac_warning{2,3}
+  tool_aacEnc=${tool_ffmpeg}
 fi
 
 # check arguments, and go to main proccess
