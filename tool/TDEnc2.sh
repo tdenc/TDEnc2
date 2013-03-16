@@ -395,7 +395,7 @@ tdeAskQuestion()
   case "${enc_type}" in
     1|2) ;;
     *)
-      tdeEcho $economy_start1
+      tdeEcho ${economy_start1}
       select item in $economy_list{1,2}
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
@@ -526,7 +526,7 @@ tdeAskQuestion()
   case "${deint_type}" in
     [1-3]) ;;
     *)
-      tdeEcho $deint_start1
+      tdeEcho ${deint_start1}
       select item in $deint_list{1..3}
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
@@ -740,7 +740,7 @@ tdeVideoEncode()
   # variables for video encoding
   local use_ffmpeg=0
   local x264_option=""
-  local ffmpeg_option="-y  -i $1 -an"
+  local ffmpeg_option="-y -i $1 -an"
 
   # bt709 for youtube, bt601 for niconico if flash_type >= 2
   # otherwise choose by o_video_height
@@ -1217,8 +1217,8 @@ tdeAudioEncode()
     tdeError
   fi
 }
-# Usage: tdeMux
-tdeMux()
+# Usage: tdeMP4
+tdeMP4()
 {
   tdeEchoS "${mp4_announce}"
 
@@ -1252,7 +1252,7 @@ tdeEnc2mp4()
   done
   tdeVideoEncode "$1"
   tdeAudioEncode "$2"
-  tdeMux
+  tdeMP4
 }
 # Usage: tdeSerialMode "${input_video}"
 tdeSerialMode()
@@ -1322,7 +1322,7 @@ need_update=$(tdeBc "${latest_version} > ${current_version}")
 if [ "${need_update}" -eq 1 ]; then
   tdeEcho $update_start{1..3}
   cat <<EOF
- $update_start4
+ ${update_start4}
  ${short_line}
 $(curl -s "http://tdenc.com/files/TDEnc2/ChangeLog")
  ${short_line}
@@ -1348,7 +1348,7 @@ fi
 # auto-install tools
 if [ ! \( -e ${tool_ffmpeg} -a -e ${tool_x264} -a -e ${tool_MP4Box} -a -e ${tool_mediainfo} \) ]; then
   tdeEcho $auto_install_start{1,2}
-  if [ "$os" = "Mac" ]; then
+  if [ "${os}" = "Mac" ]; then
     # for mac
     curl -O "http://tdenc.com/files/TDEnc2/Mac.zip"
     if [ "$?" -eq 0 ]; then
@@ -1364,7 +1364,7 @@ if [ ! \( -e ${tool_ffmpeg} -a -e ${tool_x264} -a -e ${tool_MP4Box} -a -e ${tool
   chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
 fi
 
-# check tools, `which $tool` if necessary
+# check tools, `which ${tool}` if necessary
 ./${tool_ffmpeg} -h >/dev/null 2>&1
 if [ "$?" -eq 0 ]; then
   tool_ffmpeg="./${tool_ffmpeg}"
@@ -1393,12 +1393,12 @@ else
   tool_mediainfo=$(which ${tool_mediainfo} 2>/dev/null)
   [ -z "${tool_mediainfo}" ] && tdeEcho $tool_error{1,2} && tdeError
 fi
-if [ "$os" = "Mac" ]; then
+if [ "${os}" = "Mac" ]; then
   [ "${mac_aacEnc}" = "afconvert" ] && tool_aacEnc=$(which afconvert) || tool_aacEnc=${tool_ffmpeg}
-elif [ "$os" = "Linux" ]; then
+elif [ "${os}" = "Linux" ]; then
   ./${linux_aacEnc} -help >/dev/null 2>&1
   [ "$?" -eq 0 ] && tool_aacEnc="./${linux_aacEnc}" || tool_aacEnc=${tool_ffmpeg}
-elif [ "$os" = "Windows" ]; then
+elif [ "${os}" = "Windows" ]; then
   ./${win_aacEnc} -help >/dev/null 2>&1
   [ "$?" -eq 0 ] && tool_aacEnc="./${win_aacEnc}" || tool_aacEnc=${tool_ffmpeg}
 fi
