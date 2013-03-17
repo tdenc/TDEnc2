@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.06"
+current_version="2.07"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -16,7 +16,6 @@ temp_m4a="${temp_dir}/audio.m4a"
 temp_mp4="${temp_dir}/movie.mp4"
 ver_txt="current_version"
 mkdir -p "${temp_dir}" >/dev/null 2>&1
-[ -d "${mp4_dir}" ] || mkdir -p "${mp4_dir}" >/dev/null 2>&1
 [ -s "${ver_txt}" ] && current_version=$(cat "${ver_txt}")
 # read user settings
 # edit message.conf to use TDEnc2 in your native language :)
@@ -25,6 +24,7 @@ mkdir -p "${temp_dir}" >/dev/null 2>&1
 . "../setting/user_setting.conf"
 . "../setting/x264_option.conf"
 . "../setting/ffmpeg_option.conf"
+[ -d "${mp4_dir}" ] || mkdir -p "${mp4_dir}" >/dev/null 2>&1
 # escape sequence
 if $(echo "${TERM}" | grep -iq 'xterm'); then
   color_green=$'\e[32m'
