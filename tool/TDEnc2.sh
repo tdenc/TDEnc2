@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.07"
+current_version="2.08"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -1336,8 +1336,17 @@ EOF
   done
   case "${update}" in
     1)
-      rm -f "${ver_txt}" >/dev/null 2>&1
-      tdeError
+      # backup old user settings
+      [ -d "../setting/backup" ] || mkdir -p "../setting/backup" >/dev/null 2>&1
+      cp -fpR ../setting/*.conf ../setting/backup/
+      curl -O "http://tdenc.com/files/TDEnc2/Update.zip"
+      unzip -qo Update.zip -d Update 2>/dev/null
+      cp -fpR Update/* ../
+      chmod +x TDEnc2.sh ../TDEnc2.app/Contents/MacOS/droplet
+      rm -rf "${ver_txt}" Update* >/dev/null 2>&1
+      tdeEchoS "${update_end}"
+      ./TDEnc2.sh "$@"
+      exit
       ;;
     3)
       echo "${latest_version}" > "${ver_txt}"
