@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.08"
+current_version="2.09"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -1261,7 +1261,7 @@ tdeSerialMode()
   tdeShowInfo "$1"
   video_info=($(tdeVideoInfo "$1"))
   audio_info=($(tdeAudioInfo "$1"))
-  if [ "${video_info[0]}" -eq 0 -o "${video_info[3]}" -eq 0 ]; then
+  if [ "${video_info[3]}" -eq 0 ]; then
     tdeEcho $analyze_error{1..3}
     tdeError
   fi
@@ -1274,8 +1274,8 @@ tdeMuxMode()
   tdeShowInfo "$1" "$2"
   video_info=($(tdeVideoInfo "$1"))
   audio_info=($(tdeAudioInfo "$2"))
-  if [ "${video_info[0]}" -eq 0 -o "${video_info[3]}" -eq 0 -o "${audio_info[3]}" -eq 0 ]; then
-    tdeEcho analyze_error{1..3}
+  if [ "${video_info[3]}" -eq 0 -o "${audio_info[3]}" -eq 0 ]; then
+    tdeEcho $analyze_error{1..3}
     tdeError
   fi
   tdeEnc2mp4 "$1" "$2"
