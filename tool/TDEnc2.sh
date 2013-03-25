@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.10"
+current_version="2.11"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -202,33 +202,47 @@ EOF
 # Usage: tdeShowInfo "${video_filename}" ["${audio_filename}"]
 tdeShowInfo()
 {
+  local na="N/A"
+  local input_audio
+  [ "$#" -eq 1 ] && input_audio="$1" || input_audio="$2"
+
+  local file_format=$(tdeMediaInfo -g Format "$1")\ \($(tdeMediaInfo -g FileExtension "$1")\)
+  local file_size=$(tdeMediaInfo -g FileSize/String "$1")
+  local total_bitrate=$(tdeMediaInfo -g OverallBitRate/String "$1")
+  local duration=$(tdeMediaInfo -g Duration/String "$1")
+
+  local video_format=$(tdeMediaInfo -v Format "$1")
+  local video_width=$(tdeMediaInfo -v Width/String "$1")
+  local video_height=$(tdeMediaInfo -v Height/String "$1")
+  local video_bitrate=$(tdeMediaInfo -v BitRate/String "$1")
+  local video_framerate=$(tdeMediaInfo -v FrameRate/String "$1")
+  local video_aspect_ratio=$(tdeMediaInfo -v DisplayAspectRatio/String "$1")
+
+  local image_format=$(tdeMediaInfo -i Format "$1")
+  local image_width=$(tdeMediaInfo -i Width/String "$1")
+  local image_height=$(tdeMediaInfo -i Height/String "$1")
+
+  local audio_format=$(tdeMediaInfo -a Format "${input_audio}")
+  local audio_bitrate=$(tdeMediaInfo -a BitRate/String "${input_audio}")
+  local audio_samplingrate=$(tdeMediaInfo -a SamplingRate/String "${input_audio}")
+  local audio_channels=$(tdeMediaInfo -a Channels "${input_audio}")
+
   cat <<EOF
- File Format    : $(tdeMediaInfo -g Format "$1") ($(tdeMediaInfo -g FileExtension "$1"))
- File Size      : $(tdeMediaInfo -g FileSize/String "$1")
- Total Bitrate  : $(tdeMediaInfo -g OverallBitRate/String "$1")
- Duration       : $(tdeMediaInfo -g Duration/String "$1")
- Video Codec    : $(tdeMediaInfo -v Format "$1")
- Video Bitrate  : $(tdeMediaInfo -v BitRate/String "$1")
- Video Width    : $(tdeMediaInfo -v Width/String "$1")
- Video Height   : $(tdeMediaInfo -v Height/String "$1")
- Framerate      : $(tdeMediaInfo -v FrameRate/String "$1")
- Aspect Ratio   : $(tdeMediaInfo -v DisplayAspectRatio/String "$1")
+ File Format         : ${file_format:-${na}}
+ File Size           : ${file_size:-${na}}
+ Total Bitrate       : ${total_bitrate:-${na}}
+ Duration            : ${duration:-${na}}
+ Video(Image) Format : ${video_format:-${image_format}}
+ Video(Image) Width  : ${video_width:-${image_width}}
+ Video(Image) Height : ${video_height:-${image_height}}
+ Video Bitrate       : ${video_bitrate:-${na}}
+ Framerate           : ${video_framerate:-${na}}
+ Aspect Ratio        : ${video_aspect_ratio:-${na}}
+ Audio Format        : ${audio_format:-${na}}
+ Audio Bitrate       : ${audio_bitrate:-${na}}
+ Samlingrate         : ${audio_samplingrate:-${na}}
+ Channels            : ${audio_channels:-${na}}
 EOF
-if [ "$#" -eq 1 ]; then
-  cat <<EOF
- Audio Codec    : $(tdeMediaInfo -a Format "$1")
- Audio Bitrate  : $(tdeMediaInfo -a BitRate/String "$1")
- Samlingrate    : $(tdeMediaInfo -a SamplingRate/String "$1")
- Channels       : $(tdeMediaInfo -a Channels "$1")
-EOF
-else
-  cat <<EOF
- Audio Codec    : $(tdeMediaInfo -a Format "$2")
- Audio Bitrate  : $(tdeMediaInfo -a BitRate/String "$2")
- Samlingrate    : $(tdeMediaInfo -a SamplingRate/String "$2")
- Channels       : $(tdeMediaInfo -a Channels "$2")
-EOF
-fi
 }
 tdeAskQuestion()
 {
