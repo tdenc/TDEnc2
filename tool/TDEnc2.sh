@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.12"
+current_version="2.13"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -803,7 +803,10 @@ tdeVideoEncode()
   # video_info[1](video bitrate) is 0 if the source file is a still image
   if [ ${video_info[1]} -eq 0 ]; then
     use_ffmpeg=1
-    ffmpeg_option="-f image2 -loop 1 ${ffmpeg_option} -t ${question_info[10]}"
+    # the lower fps, the smaller file size
+    # dont specify too low fps, such as 1fps, or flash player couldnt play it back accurately
+    video_info[2]=10
+    ffmpeg_option="-f image2 -loop 1 ${ffmpeg_option} -r ${video_info[2]} -t ${question_info[10]}"
   fi
   # question_info[8] is deint_type
   if [ "${question_info[8]}" -eq 2 -o "${video_info[7]}" != "Progressive" ]; then
