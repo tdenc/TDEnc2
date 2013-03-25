@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.11"
+current_version="2.12"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -762,7 +762,7 @@ tdeVideoEncode()
   # variables for video encoding
   local use_ffmpeg=0
   local x264_option=""
-  local ffmpeg_option="-y -i $1 -an"
+  local ffmpeg_option="-y -i $1 -an -pix_fmt yuv420p"
 
   # bt709 for youtube, bt601 for niconico if flash_type >= 2
   # otherwise choose by o_video_height
