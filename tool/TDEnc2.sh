@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.09"
+current_version="2.10"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -145,11 +145,12 @@ tdeBc()
 {
   echo "scale=3; $1" | bc
 }
-# Usage: tdeMediaInfo -v[-a|-g] "${Param}" "${input_filename}"
+# Usage: tdeMediaInfo -v[-i|-a|-g] "${Param}" "${input_filename}"
 tdeMediaInfo()
 {
   case "$1" in
     -v) media_param="Video";;
+    -i) media_param="Image";;
     -a) media_param="Audio";;
     -g) media_param="General";;
   esac
@@ -161,8 +162,15 @@ tdeVideoInfo()
   local video_duration=$(tdeMediaInfo -v Duration "$1")
   local video_bitrate=$(tdeMediaInfo -v BitRate "$1")
   local video_fps=$(tdeMediaInfo -v FrameRate "$1")
-  local video_width=$(tdeMediaInfo -v Width "$1")
-  local video_height=$(tdeMediaInfo -v Height "$1")
+  local video_width video_height
+  image_pattern="jpe?g|png|bmp|tif+"
+  if [[ ${video_ext} =~ ${image_pattern} ]]; then
+    video_width=$(tdeMediaInfo -i Width "$1")
+    video_height=$(tdeMediaInfo -i Height "$1")
+  else
+    video_width=$(tdeMediaInfo -v Width "$1")
+    video_height=$(tdeMediaInfo -v Height "$1")
+  fi
   local video_dar=$(tdeMediaInfo -v DisplayAspectRatio "$1")
   local video_par=$(tdeMediaInfo -v PixelAspectRatio "$1")
   local video_scantype=$(tdeMediaInfo -v ScanType "$1")
@@ -777,6 +785,12 @@ tdeVideoEncode()
   # convert colormatrix if in_matrix != out_matrix
 
   # define use_ffmpeg
+  # use ffmpeg for tdeMuxMode with a still image
+  # video_info[1](video bitrate) is 0 if the source file is a still image
+  if [ ${video_info[1]} -eq 0 ]; then
+    use_ffmpeg=1
+    ffmpeg_option="-f image2 -loop 1 ${ffmpeg_option} -t ${question_info[10]}"
+  fi
   # question_info[8] is deint_type
   if [ "${question_info[8]}" -eq 2 -o "${video_info[7]}" != "Progressive" ]; then
     use_ffmpeg=1
@@ -1274,7 +1288,8 @@ tdeMuxMode()
   tdeShowInfo "$1" "$2"
   video_info=($(tdeVideoInfo "$1"))
   audio_info=($(tdeAudioInfo "$2"))
-  if [ "${video_info[3]}" -eq 0 -o "${audio_info[3]}" -eq 0 ]; then
+  [ "${video_info[0]}" -eq 0 ] && video_info[0]="${audio_info[0]}"
+  if [ "${video_info[3]}" -eq 0 -o "${audio_info[0]}" -eq 0 ]; then
     tdeEcho $analyze_error{1..3}
     tdeError
   fi
