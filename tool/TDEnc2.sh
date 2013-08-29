@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.13"
+current_version="2.14"
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -824,10 +824,13 @@ tdeVideoEncode()
   fi
 
   # define other options
+  # round off fps and set $keyint
+  local keyint=$(tdeBc "${video_info[2]} + 0.5")
+  keyint=$((${keyint%.*} * 10))
   case "${use_ffmpeg}" in
     0)
       # define x264 options
-      x264_option="$1 ${x264_common[*]}"
+      x264_option="$1 ${x264_common[*]} --keyint $keyint"
       # question_info[2] is preset_type
       if [ "${question_info[2]}" -lt 3 ]; then
         x264_option="${x264_option} ${x264_anime[*]}"
@@ -967,11 +970,12 @@ tdeVideoEncode()
     1)
       local libx264_option="-vcodec libx264 -passlogfile ${temp_dir}/x264.log -x264opts"
       # define libx264 options
+      libx264_option="${libx264_option} keyint=$keyint"
       # colormatrix
       if [ "${out_matrix}" = "BT.709" ]; then
-        libx264_option="${libx264_option} colormatrix=bt709"
+        libx264_option="${libx264_option}:colormatrix=bt709"
       else
-        libx264_option="${libx264_option} colormatrix=smpte170m"
+        libx264_option="${libx264_option}:colormatrix=smpte170m"
       fi
       for item in ${ffmpeg_common[@]}
       do
