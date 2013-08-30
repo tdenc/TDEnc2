@@ -7,7 +7,8 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.14"
+current_version="2.15"
+current_x264_version=2358
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
 temp_264="${temp_dir}/video.h264"
@@ -1316,6 +1317,24 @@ tdeMuxMode()
   fi
   tdeEnc2mp4 "$1" "$2"
 }
+tdeToolUpdate()
+{
+  tdeEcho $auto_install_start{1,2}
+  if [ "${os}" = "Mac" ]; then
+    # for mac
+    curl -O "http://tdenc.com/files/TDEnc2/Mac.zip"
+    if [ "$?" -eq 0 ]; then
+      tdeEchoS "${auto_install_end}"
+    else
+      tdeEcho $auto_install_error{1,2}
+      tdeError
+    fi
+    unzip -qjo Mac.zip 2>/dev/null
+    rm Mac.zip
+    # TODO: for linux and windows
+  fi
+  chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
+}
 
 
 ####################################################################################################
@@ -1392,21 +1411,7 @@ fi
 
 # auto-install tools
 if [ ! \( -e ${tool_ffmpeg} -a -e ${tool_x264} -a -e ${tool_MP4Box} -a -e ${tool_mediainfo} \) ]; then
-  tdeEcho $auto_install_start{1,2}
-  if [ "${os}" = "Mac" ]; then
-    # for mac
-    curl -O "http://tdenc.com/files/TDEnc2/Mac.zip"
-    if [ "$?" -eq 0 ]; then
-      tdeEchoS "${auto_install_end}"
-    else
-      tdeEcho $auto_install_error{1,2}
-      tdeError
-    fi
-    unzip -qjo Mac.zip 2>/dev/null
-    rm Mac.zip
-    # TODO: for linux and windows
-  fi
-  chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
+  tdeToolUpdate
 fi
 
 # check tools, `which ${tool}` if necessary
@@ -1423,6 +1428,11 @@ if [ "$?" -eq 0 ]; then
 else
   tool_x264=$(which ${tool_x264} 2>/dev/null)
   [ -z "${tool_x264}" ] && tdeEcho $tool_error{1,2} && tdeError
+fi
+tool_x264_version=$(${tool_x264} --version | head -n1)
+if $(echo "${tool_x264_version}" | grep -ivq "${current_x264_version}"); then
+  rm ${tool_x264}
+  tdeToolUpdate
 fi
 ./${tool_MP4Box} -h >/dev/null 2>&1
 if [ "$?" -eq 0 ]; then
