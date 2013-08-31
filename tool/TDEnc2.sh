@@ -7,7 +7,7 @@ cd "${current_dir}"
 # Variables
 ####################################################################################################
 # version of this script
-current_version="2.15"
+current_version="2.16"
 current_x264_version=2358
 # use proccess ID for multiple-running
 temp_dir="temp/$$"
@@ -1398,7 +1398,8 @@ EOF
       unzip -qo Update.zip -d Update 2>/dev/null
       cp -fpR Update/* ../
       chmod +x TDEnc2.sh ../TDEnc2.app/Contents/MacOS/droplet
-      rm -rf "${ver_txt}" Update* >/dev/null 2>&1
+      rm -rf Update* >/dev/null 2>&1
+      echo "${latest_version}" > "${ver_txt}"
       tdeEchoS "${update_end}"
       ./TDEnc2.sh "$@"
       exit
