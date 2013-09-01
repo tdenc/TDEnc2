@@ -1,23 +1,26 @@
 #!/bin/bash
+# vim:set ts=2 sw=2 tw=0 ft=sh:
+
+# `cd` to "tool" derectory
 current_dir="$(dirname "$0")"
 cd "${current_dir}"
 
-
-####################################################################################################
-# Variables
-####################################################################################################
-# version of this script
+### Variables ### {{{
+# version of this script and x264
 current_version="2.16"
 current_x264_version=2358
-# use proccess ID for multiple-running
+
+# make a directory for temporary files
+# use PID for multiple-running
 temp_dir="temp/$$"
+mkdir -p "${temp_dir}" >/dev/null 2>&1
 temp_264="${temp_dir}/video.h264"
 temp_wav="${temp_dir}/audio.wav"
 temp_m4a="${temp_dir}/audio.m4a"
 temp_mp4="${temp_dir}/movie.mp4"
 ver_txt="current_version"
-mkdir -p "${temp_dir}" >/dev/null 2>&1
 [ -s "${ver_txt}" ] && current_version=$(cat "${ver_txt}")
+
 # read user settings
 # edit message.conf to use TDEnc2 in your native language :)
 . "../setting/message.conf"
@@ -26,6 +29,7 @@ mkdir -p "${temp_dir}" >/dev/null 2>&1
 . "../setting/x264_option.conf"
 . "../setting/ffmpeg_option.conf"
 [ -d "${mp4_dir}" ] || mkdir -p "${mp4_dir}" >/dev/null 2>&1
+
 # escape sequence
 if $(echo "${TERM}" | grep -iq 'xterm'); then
   color_green=$'\e[32m'
@@ -40,13 +44,13 @@ else
   color_purple=""
   color_reset=""
 fi
+
 # prompt for `select`
 PS3=">> "
 
+# }}}
 
-####################################################################################################
-# Data Structures
-####################################################################################################
+### Data Structures ### {{{
 # i wish i could use bash 4 for associative arrays...
 # question_info    = (
 #              [0]    question_type      : 1-3 ( 1:easy, 3:difficult )
@@ -85,17 +89,16 @@ PS3=">> "
 #           [2]   SamplingRate
 #           [3]   Channels
 #                )
+# }}}
 
-
-####################################################################################################
-# Functions
-####################################################################################################
+### Functions ### {{{
 tdeHandler()
 {
   # delete temporary files when C-c
   rm -rf "${temp_dir}"
   exit 1
 }
+
 tdeError()
 {
   # if you dont want to delete log files for debugging, comment out the following line
@@ -104,6 +107,7 @@ tdeError()
   echo "${color_blue}${border_line}${color_reset}" >&2
   exit 1
 }
+
 tdeSuccess()
 {
   rm -rf "${temp_dir}"
@@ -112,6 +116,7 @@ tdeSuccess()
   [ "${os}" = "Mac" ] && open "${mp4_dir}"
   exit 0
 }
+
 # Usage: tdeEcho ${long_message}
 tdeEcho()
 {
@@ -123,6 +128,7 @@ tdeEcho()
   done
   echo "${color_blue}${border_line}${color_reset}" >&2
 }
+
 # Usage: tdeEchoS ${short_message}
 tdeEchoS()
 {
@@ -135,17 +141,20 @@ tdeEchoS()
   echo "${color_purple}${short_line}${color_reset}" >&2
   sleep 1
 }
+
 # Usage: tdeMin "${int1}" "${int2}" ( returns the smaller )
 tdeMin()
 {
   [ "$1" -le "$2" ] && echo "$1" || echo "$2"
 }
-# Usage: tdeMin "${float1} + ${float2}" ( returns the result )
-#        tdeMin "${float1} > ${float2}" ( returns 1 if true, 0 if false )
+
+# Usage: tdeBc "${float1} + ${float2}" ( returns the result )
+#        tdeBc "${float1} > ${float2}" ( returns 1 if true, 0 if false )
 tdeBc()
 {
   echo "scale=3; $1" | bc
 }
+
 # Usage: tdeMediaInfo -v[-i|-a|-g] "${Param}" "${input_filename}"
 tdeMediaInfo()
 {
@@ -157,7 +166,8 @@ tdeMediaInfo()
   esac
   ${tool_mediainfo} --Inform\=${media_param}\;%"$2"% "$3"
 }
-# tdeVideoInfo() for video_info[] and tdeAudioInfo() for audio_info[]
+
+# tdeVideoInfo() for video_info[]
 tdeVideoInfo()
 {
   local video_duration=$(tdeMediaInfo -v Duration "$1")
@@ -186,6 +196,8 @@ tdeVideoInfo()
   ${video_scantype:-Progressive}
 EOF
 }
+
+# tdeAudioInfo() for audio_info[]
 tdeAudioInfo()
 {
   local audio_duration=$(tdeMediaInfo -a Duration "$1")
@@ -200,6 +212,7 @@ tdeAudioInfo()
 EOF
   tdeEchoS "${analyze_end}" >&2
 }
+
 # Usage: tdeShowInfo "${video_filename}" ["${audio_filename}"]
 tdeShowInfo()
 {
@@ -245,6 +258,7 @@ tdeShowInfo()
  Channels            : ${audio_channels:-${na}}
 EOF
 }
+
 tdeAskQuestion()
 {
   # define local variables
@@ -755,6 +769,7 @@ EOF
     ${limit_bitrate:-2000}
 EOF
 }
+
 # Usage: tdeVideoEncode "${input_video}"
 tdeVideoEncode()
 {
@@ -825,13 +840,13 @@ tdeVideoEncode()
   fi
 
   # define other options
-  # round off fps and set $keyint
+  # round off fps and set ${keyint}
   local keyint=$(tdeBc "${video_info[2]} + 0.5")
   keyint=$((${keyint%.*} * 10))
   case "${use_ffmpeg}" in
     0)
       # define x264 options
-      x264_option="$1 ${x264_common[*]} --keyint $keyint"
+      x264_option="$1 ${x264_common[*]} --keyint ${keyint}"
       # question_info[2] is preset_type
       if [ "${question_info[2]}" -lt 3 ]; then
         x264_option="${x264_option} ${x264_anime[*]}"
@@ -971,7 +986,7 @@ tdeVideoEncode()
     1)
       local libx264_option="-vcodec libx264 -passlogfile ${temp_dir}/x264.log -x264opts"
       # define libx264 options
-      libx264_option="${libx264_option} keyint=$keyint"
+      libx264_option="${libx264_option} keyint=${keyint}"
       # colormatrix
       if [ "${out_matrix}" = "BT.709" ]; then
         libx264_option="${libx264_option}:colormatrix=bt709"
@@ -1145,6 +1160,7 @@ tdeVideoEncode()
       ;;
   esac
 }
+
 # Usage: tdeAudioEncode "${input_audio}"
 tdeAudioEncode()
 {
@@ -1253,6 +1269,7 @@ tdeAudioEncode()
     tdeError
   fi
 }
+
 # Usage: tdeMP4
 tdeMP4()
 {
@@ -1277,6 +1294,7 @@ tdeMP4()
   #TODO: check file size
   tdeShowInfo "${output_mp4name}"
 }
+
 # Usage: tdeEnc2mp4 "${input_video}" "${input_audio}"
 tdeEnc2mp4()
 {
@@ -1290,6 +1308,7 @@ tdeEnc2mp4()
   tdeAudioEncode "$2"
   tdeMP4
 }
+
 # Usage: tdeSerialMode "${input_video}"
 tdeSerialMode()
 {
@@ -1303,6 +1322,7 @@ tdeSerialMode()
   fi
   tdeEnc2mp4 "$1" "$1"
 }
+
 # Usage: tdeMuxMode "${input_video}" "${input_audio}"
 tdeMuxMode()
 {
@@ -1317,6 +1337,7 @@ tdeMuxMode()
   fi
   tdeEnc2mp4 "$1" "$2"
 }
+
 tdeToolUpdate()
 {
   tdeEcho $auto_install_start{1,2}
@@ -1336,10 +1357,9 @@ tdeToolUpdate()
   chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
 }
 
+# }}}
 
-####################################################################################################
-# Start TDEnc2
-####################################################################################################
+### Start TDEnc2 ### {{{
 trap "tdeHandler" INT
 # os
 # might run on other platforms, i dont care though :p
@@ -1370,7 +1390,7 @@ echo "${color_green}+${color_blue}---------------------------${color_green}+"
 echo "${color_blue}| ${color_purple}TDEnc2 for Bash (ver${current_version}) ${color_blue}|"
 echo "${color_green}+${color_blue}---------------------------${color_green}+${color_reset}"
 
-# check updates. not auto-updating yet. sry
+# check updates and auto-update
 latest_version=$(curl -s "http://tdenc.com/files/TDEnc2/latest_version")
 [ -z "${latest_version}" ] && latest_version=${current_version}
 need_update=$(tdeBc "${latest_version} > ${current_version}")
@@ -1569,5 +1589,7 @@ case "$#" in
     tdeSuccess
     ;;
 esac
+
+# }}}
 
 # end of file. hehehe.
