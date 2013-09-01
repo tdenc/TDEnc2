@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script and x264
-current_version="2.16"
+current_version="2.17"
 current_x264_version=2358
 
 # make a directory for temporary files
@@ -1276,8 +1276,18 @@ tdeMP4()
   tdeEchoS "${mp4_announce}"
 
   # start muxing
-  [ "${question_info[2]}" -eq 7 ] || mp4_fps="-fps ${video_info[2]}"
-  ${tool_MP4Box} ${mp4_fps} -add "${temp_264}#video" -add "${temp_m4a}#audio" -new "${temp_mp4}"
+  if [ -n "${tool_MP4Box}" ]; then
+    [ "${question_info[2]}" -eq 7 ] || mp4_fps="-fps ${video_info[2]}"
+    ${tool_MP4Box} ${mp4_fps} -add "${temp_264}#video" -add "${temp_m4a}#audio" -new "${temp_mp4}"
+  else
+    if [ "${question_info[2]}" -eq 7 ]; then
+      ${tool_ffmpeg} -loglevel quiet -i "${temp_264}" -an -vcodec copy "${temp_dir}/video.h264"
+      temp_264="${temp_dir}/video.h264"
+    else
+      mp4_fps="-r ${video_info[2]}"
+    fi
+    ${tool_ffmpeg} ${mp4_fps} -i "${temp_264}" -i "${temp_m4a}" -vcodec copy -acodec copy "${temp_mp4}"
+  fi
 
   # backup
   [ -e "${output_mp4name}" ] && mv "${output_mp4name}" "${mp4_dir}/old.mp4"
@@ -1431,7 +1441,7 @@ EOF
 fi
 
 # auto-install tools
-if [ ! \( -e ${tool_ffmpeg} -a -e ${tool_x264} -a -e ${tool_MP4Box} -a -e ${tool_mediainfo} \) ]; then
+if [ ! \( -e ${tool_ffmpeg} -a -e ${tool_x264} -a -e ${tool_mediainfo} \) ]; then
   tdeToolUpdate
 fi
 
@@ -1460,7 +1470,6 @@ if [ "$?" -eq 0 ]; then
   tool_MP4Box="./${tool_MP4Box}"
 else
   tool_MP4Box=$(which ${tool_MP4Box} 2>/dev/null)
-  [ -z "${tool_MP4Box}" ] && tdeEcho $tool_error{1,2} && tdeError
 fi
 mediainfo_check=($(./${tool_mediainfo} --version 2>/dev/null))
 if [ "${mediainfo_check}" = "MediaInfo" ]; then
