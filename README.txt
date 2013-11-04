@@ -49,6 +49,6 @@
 
 
 ＜連絡先＞
-　メール：mado1125@tdenc.com
-　ツイッター：@tdenc
+　tdenc1125@Gメール
+　tdenc@ツイッター
 

@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script and x264
-current_version="2.17"
+current_version="2.18"
 current_x264_version=2358
 
 # make a directory for temporary files
