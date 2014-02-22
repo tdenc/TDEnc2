@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script and x264
-current_version="2.18"
+current_version="2.19"
 current_x264_version=2358
 
 # make a directory for temporary files
@@ -1169,7 +1169,14 @@ tdeAudioEncode()
   # variables for audio encoder
   local aac_option
   local ffmpeg_aac="-vn -y -acodec aac -strict -2"
-  local ffmpeg_pcm="-vn -y -acodec pcm_s16le"
+  if [ "${audio_info[3]}" -gt 5 ]; then
+    pcm_c_layout="5.1"
+  elif [ "${audio_info[3]}" -eq 1 ]; then
+    pcm_c_layout="mono"
+  else
+    pcm_c_layout="stereo"
+  fi
+  local ffmpeg_pcm="-vn -y -acodec pcm_s16le -channel_layout ${pcm_c_layout}"
 
   # silent
   if [ "${question_info[15]}" -eq 0 -o "${audio_info[0]}" -eq 0 ]; then
@@ -1202,6 +1209,9 @@ tdeAudioEncode()
       apple_profile="aac"
     fi
     aac_option="-v -b ${a_bitrate}000 -s 2 -f m4af -d ${apple_profile}"
+    if [ "${pcm_c_layout}" = "5.1" ]; then
+      aac_option="${aac_option} -l AAC_5_1"
+    fi
   elif $(echo ${tool_aacEnc} | grep -iq 'neroAacEnc'); then
     aac_option="-2pass -br ${a_bitrate}000"
   else
