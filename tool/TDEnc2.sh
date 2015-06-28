@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script and x264
-current_version="2.21"
+current_version="2.20"
 current_x264_version=2358
 
 # make a directory for temporary files
@@ -916,6 +916,7 @@ tdeVideoEncode()
       # start video encoding
       case "${x264_pass}" in
         0)
+          local h264_size
           local h264_bitrate
           # question_info[5] is crf_type
           if [ "${question_info[5]}" -ne 2 ]; then
@@ -924,7 +925,8 @@ tdeVideoEncode()
             ${tool_x264} ${x264_option} ${x264_crf} -o "${temp_264}"
             if [ -s "${temp_264}" ]; then
               # question_info[14] is video_bitrate
-              h264_bitrate=$(tdeMediaInfo -g "BitRate" "${temp_264}")
+              h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+              h264_bitrate=$((${h264_size} / ${video_info[0]}))
               if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
                 tdeEchoS "${video_enc_success}"
                 return
@@ -941,7 +943,8 @@ tdeVideoEncode()
           ${tool_x264} ${x264_option} -p 3 -o "${temp_264}"
           # auto 3pass
           if [ -s "${temp_264}" ]; then
-            h264_bitrate=$(tdeMediaInfo -g "BitRate" "${temp_264}")
+            h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+            h264_bitrate=$((${h264_size} / ${video_info[0]}))
             if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
               tdeEchoS "${video_enc_success}"
               return
@@ -1084,6 +1087,7 @@ tdeVideoEncode()
       # start video encoding
       case "${x264_pass}" in
         0)
+          local h264_size
           local h264_bitrate
           # question_info[5] is crf_type
           if [ "${question_info[5]}" -ne 2 ]; then
@@ -1092,7 +1096,8 @@ tdeVideoEncode()
             ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option}${libx264_crf} "${temp_264}"
             if [ -s "${temp_264}" ]; then
               # question_info[14] is video_bitrate
-              h264_bitrate=$(tdeMediaInfo -g "BitRate" "${temp_264}")
+              h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+              h264_bitrate=$((${h264_size} / ${video_info[0]}))
               if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
                 tdeEchoS "${video_enc_success}"
                 return
@@ -1110,7 +1115,8 @@ tdeVideoEncode()
           ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
           # auto 3pass
           if [ -s "${temp_264}" ]; then
-            h264_bitrate=$(tdeMediaInfo -g "BitRate" "${temp_264}")
+            h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+            h264_bitrate=$((${h264_size} / ${video_info[0]}))
             if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
               tdeEchoS "${video_enc_success}"
               return
@@ -1232,7 +1238,8 @@ tdeAudioEncode()
   # skip audio encoding if the audio format is AAC and the bitrate is low enough
   local audio_codec=$(tdeMediaInfo -a Format "%1")
   if $(echo "${audio_codec}" | grep -iq 'AAC'); then
-    local h264_bitrate=$(tdeMediaInfo -g "BitRate" "${temp_264}")
+    local h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+    local h264_bitrate=$((${h264_size} / ${video_info[0]}))
     local a_limit_bitrate=$((${question_info[18]} - ${h264_bitrate}))
     if [ "${audio_info[1]}" -lt "${a_limit_bitrate}" ]; then
       temp_m4a="$1"
