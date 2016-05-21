@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script and x264
-current_version="2.24"
+current_version="2.25"
 current_x264_version=2358
 
 # make a directory for temporary files
@@ -1411,7 +1411,7 @@ echo "${color_blue}| ${color_purple}TDEnc2 for Bash (ver${current_version}) ${co
 echo "${color_green}+${color_blue}---------------------------${color_green}+${color_reset}"
 
 # check updates and auto-update
-latest_version=$(curl -s "https://raw.githubusercontent.com/tdenc/TDEnc2/master/current_version")
+latest_version=$(curl -s "https://raw.githubusercontent.com/tdenc/TDEnc2/master/tool/current_version")
 [ -z "${latest_version}" ] && latest_version=${current_version}
 need_update=$(tdeBc "${latest_version} > ${current_version}")
 if [ "${need_update}" -eq 1 ]; then
@@ -1419,7 +1419,7 @@ if [ "${need_update}" -eq 1 ]; then
   cat <<EOF
  ${update_start4}
  ${short_line}
-$(curl -s "https://raw.githubusercontent.com/tdenc/TDEnc2/master/ChangeLog")
+$(curl -s "https://raw.githubusercontent.com/tdenc/TDEnc2/master/tool/ChangeLog")
  ${short_line}
 
 EOF
