@@ -1363,7 +1363,7 @@ tdeToolUpdate()
   tdeEcho $auto_install_start{1,2}
   if [ "${os}" = "Mac" ]; then
     # for mac
-    curl -O "http://tdenc.com/files/TDEnc2/Mac.zip"
+    curl -o Mac.zip -L "https://drive.google.com/uc?id=0B0If6OXG2yfVVGVDV0JZN3Z5Sm8"
     if [ "$?" -eq 0 ]; then
       tdeEchoS "${auto_install_end}"
     else
@@ -1411,7 +1411,7 @@ echo "${color_blue}| ${color_purple}TDEnc2 for Bash (ver${current_version}) ${co
 echo "${color_green}+${color_blue}---------------------------${color_green}+${color_reset}"
 
 # check updates and auto-update
-latest_version=$(curl -s "http://tdenc.com/files/TDEnc2/latest_version")
+latest_version=$(curl -s "https://raw.githubusercontent.com/tdenc/TDEnc2/master/current_version")
 [ -z "${latest_version}" ] && latest_version=${current_version}
 need_update=$(tdeBc "${latest_version} > ${current_version}")
 if [ "${need_update}" -eq 1 ]; then
@@ -1419,7 +1419,7 @@ if [ "${need_update}" -eq 1 ]; then
   cat <<EOF
  ${update_start4}
  ${short_line}
-$(curl -s "http://tdenc.com/files/TDEnc2/ChangeLog")
+$(curl -s "https://raw.githubusercontent.com/tdenc/TDEnc2/master/ChangeLog")
  ${short_line}
 
 EOF
@@ -1434,12 +1434,11 @@ EOF
       # backup old user settings
       [ -d "../setting/backup" ] || mkdir -p "../setting/backup" >/dev/null 2>&1
       cp -fpR ../setting/*.conf ../setting/backup/
-      curl -O "http://tdenc.com/files/TDEnc2/Update.zip"
-      unzip -qo Update.zip -d Update 2>/dev/null
-      cp -fpR Update/* ../
+      curl -o master.zip -L "https://github.com/tdenc/TDEnc2/archive/master.zip"
+      unzip -qo master.zip 2>/dev/null
+      cp -fpR TDEnc2-master/* ../
       chmod +x TDEnc2.sh ../TDEnc2.app/Contents/MacOS/droplet
-      rm -rf Update* >/dev/null 2>&1
-      echo "${latest_version}" > "${ver_txt}"
+      rm -rf TDEnc2-master >/dev/null 2>&1
       tdeEchoS "${update_end}"
       ./TDEnc2.sh "$@"
       exit
