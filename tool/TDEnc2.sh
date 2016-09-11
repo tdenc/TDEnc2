@@ -6,9 +6,8 @@ current_dir="$(dirname "$0")"
 cd "${current_dir}"
 
 ### Variables ### {{{
-# version of this script and x264
-current_version="2.25"
-current_x264_version=2358
+# version of this script
+current_version="2.26"
 
 # make a directory for temporary files
 # use PID for multiple-running
@@ -26,7 +25,6 @@ ver_txt="current_version"
 . "../setting/message.conf"
 . "../setting/default_setting"
 . "../setting/user_setting.conf"
-. "../setting/x264_option.conf"
 . "../setting/ffmpeg_option.conf"
 [ -d "${mp4_dir}" ] || mkdir -p "${mp4_dir}" >/dev/null 2>&1
 
@@ -53,16 +51,16 @@ PS3=">> "
 ### Data Structures ### {{{
 # i wish i could use bash 4 for associative arrays...
 # question_info    = (
-#              [0]    question_type      : 1-3 ( 1:easy, 3:difficult )
-#              [1]    site_type         : 1-2 ( 1:niconico, 2:youtube )
-#              [2]    preset_type         : 1-9 ( 7:sing, 8:user-preset ,9:youtube )
+#              [0]    question_type       : 1-3 ( 1:easy, 3:difficult )
+#              [1]    site_type           : 1-3 ( 1:niconico(old), 2:niconico(new), 3:youtube )
+#              [2]    preset_type         : 1-9 ( 7:sing, 8:user-preset, 9:youtube )
 #              [3]    account_type        : 1-2 ( 1:premium, 2:normal )
 #              [4]    enc_type            : 1-2 ( 1:high, 2:economy )
-#              [5]    crf_type             : 1-3 ( 1:auto, 2:no, 3:manual )
+#              [5]    crf_type            : 1-3 ( 1:auto, 2:no, 3:manual )
 #              [6]    dec_type            : 1-2 ( 1:fast, 2:normal )
 #              [7]    flash_type          : 1-3 ( 1:normal, 3:strict )
-#              [8]    deint_type         : 1-2 ( 1:auto, 2:no, 3:force )
-#              [9]    resize_type        : 1-2 ( 1:auto, 2:no, 3:manual )
+#              [8]    deint_type          : 1-2 ( 1:auto, 2:no, 3:force )
+#              [9]    resize_type         : 1-2 ( 1:auto, 2:no, 3:manual )
 #              [10]   total_time_sec      : int
 #              [11]   o_video_width       : int
 #              [12]   o_video_height      : int
@@ -72,6 +70,7 @@ PS3=">> "
 #              [16]   audio_samplingrate  : 1-4 ( 1:44100, 2:48000, 3:96000, 4:same as source )
 #              [17]   samplingrate_value  : int
 #              [18]   limit_bitrate       : int
+#              [19]   denoise_type        : 1-3 ( 1:auto, 2:yes, 3:no )
 #                    )
 # video_info   = (
 #           [0]   Duration
@@ -145,7 +144,7 @@ tdeEchoS()
 # Usage: tdeMin "${int1}" "${int2}" ( returns the smaller )
 tdeMin()
 {
-  [ "$1" -le "$2" ] && echo "$1" || echo "$2"
+  [ "$1" -le $2 ] && echo $1 || echo $2
 }
 
 # Usage: tdeBc "${float1} + ${float2}" ( returns the result )
@@ -277,6 +276,7 @@ tdeAskQuestion()
   local resize_value="${resize_value}"
   local audio_bitrate="${audio_bitrate}"
   local audio_samplingrate="${audio_samplingrate}"
+  local denoise_type="${denoise_type}"
   local skip_mode="${skip_mode}"
   local ret str
   local x264_pass
@@ -294,6 +294,8 @@ tdeAskQuestion()
         p_temp_bitrate=${p_temp_bitrate%%[\.]*}
   local i_temp_bitrate=$(tdeBc "${size_normal} * 1024 * 8 / ${total_time_sec}")
         i_temp_bitrate=${i_temp_bitrate%%[\.]*}
+  local p_temp_bitrate_new=$(tdeBc "${size_premium_new} * 1024 * 8 / ${total_time_sec}")
+        p_temp_bitrate_new=${p_temp_bitrate_new%%[\.]*}
   local y_p_temp_bitrate=$(tdeBc "${size_youtube_partner} * 1024 * 8 / ${total_time_sec}")
         y_p_temp_bitrate=${y_p_temp_bitrate%%[\.]*}
   local y_i_temp_bitrate=$(tdeBc "${size_youtube_normal} * 1024 * 8 / ${total_time_sec}")
@@ -304,13 +306,19 @@ tdeAskQuestion()
   local o_video_height=$((${auto_height} + ${auto_height} % 2))
   local i_video_width=$(tdeBc "${video_info[3]} * ${video_info[6]}")
         i_video_width=${i_video_width%%[\.]*}
+        i_video_width=$((${i_video_width} + ${i_video_width} % 2))
   if [ -n "${auto_width}" ]; then
     local o_video_width=$((${auto_width} + ${auto_width} % 2))
   else
     local o_video_width=$(tdeBc "${auto_height} * ${i_video_width} / ${video_info[4]}")
-    o_video_width=${o_video_width%%[\.]*}
-    o_video_width=$((${o_video_width} + ${o_video_width} % 2))
+          o_video_width=${o_video_width%%[\.]*}
+          o_video_width=$((${o_video_width} + ${o_video_width} % 2))
   fi
+  local o_video_height_new=$((${auto_height_new} + ${auto_height_new} % 2))
+        o_video_height_new=${o_video_height_new%%[\.]*}
+  local o_video_width_new=$(tdeBc "${auto_height_new} * ${i_video_width} / ${video_info[4]}")
+        o_video_width_new=${o_video_width_new%%[\.]*}
+        o_video_width_new=$((${o_video_width_new} + ${o_video_width_new} % 2))
 
   # start question
   tdeEcho $question_start{1,2}
@@ -339,15 +347,16 @@ tdeAskQuestion()
       total_bitrate=0
       flash_type=1
       resize_type=1
+      denoise_type=1
     fi
   fi
 
   # upload site
   case "${site_type}" in
-    1|2) ;;
+    1|2|3) ;;
     *)
       tdeEcho "${site_type_start}"
-      select item in "NicoNico" "YouTube"
+      select item in "NicoNico(old)" "NicoNico(new)" "YouTube"
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
         site_type="${REPLY}"
@@ -356,6 +365,14 @@ tdeAskQuestion()
       ;;
   esac
   if [ "${site_type}" -eq 2 ]; then
+    y_account_type=1
+    preset_type=9
+    audio_samplingrate=1
+    enc_type=1
+    crf_type=1
+    dec_type=2
+    flash_type=1
+  elif [ "${site_type}" -eq 3 ]; then
     preset_type=9
     audio_samplingrate=2
     enc_type=1
@@ -399,13 +416,13 @@ tdeAskQuestion()
 
   # choose account type
   if [ "${preset_type}" -ne 9 ]; then
-    account_type="${y_account_type}"
+    account_type="${n_account_type}"
     account_start1="${premium_start1}"
     account_start2="${premium_start2}"
     account_list1="${premium_list1}"
     account_list2="${premium_list2}"
   else
-    account_type="${n_account_type}"
+    account_type="${y_account_type}"
     account_start1="${premium_start3}"
     account_start2="${premium_start4}"
     account_list1="${premium_list3}"
@@ -451,7 +468,7 @@ tdeAskQuestion()
   fi
 
   # total bitrate
-  if [ "${site_type}" -eq 2 ]; then
+  if [ "${site_type}" -eq 3 ]; then
     if [ "${account_type}" -eq 1 ]; then
       total_bitrate="${y_p_temp_bitrate}"
       limit_bitrate="${y_p_temp_bitrate}"
@@ -459,6 +476,9 @@ tdeAskQuestion()
       total_bitrate="${y_i_temp_bitrate}"
       limit_bitrate="${y_i_temp_bitrate}"
     fi
+  elif [ "${site_type}" -eq 2 ]; then
+    total_bitrate="${p_temp_bitrate_new}"
+    limit_bitrate="${p_temp_bitrate_new}"
   else
     if [ "${account_type}" -eq 1 ]; then
       limit_bitrate="${p_temp_bitrate}"
@@ -488,7 +508,7 @@ tdeAskQuestion()
   fi
 
   # crf encode
-  [ "${total_bitrate}" -lt "${bitrate_threshold}" ] && crf_type=2
+  [ "${total_bitrate}" -lt ${bitrate_threshold} ] && crf_type=2
   [ -n "${crf_value}" ] && crf_type=3
   case "${crf_type}" in
     [1-3]) ;;
@@ -504,7 +524,7 @@ tdeAskQuestion()
   esac
   case "${crf_type}" in
     1)
-      if [ "${site_type}" -eq 2 ]; then
+      if [ "${site_type}" -ne 1 ]; then
         crf_value="${crf_you}"
       elif [ "${account_type}" -eq 1 ]; then
         crf_value="${crf_high}"
@@ -589,7 +609,17 @@ tdeAskQuestion()
   if [ "${resize_type}" -eq 2 ]; then
     o_video_width="${i_video_width}"
     o_video_height="${i_video_height}"
-  elif [ "${resize_type}" -eq 3 ]; then
+  elif [ "${resize_type}" -eq 1 ]; then
+    if [ "${site_type}" -eq 2 ];then
+      if [ "${i_video_height}" -lt ${o_video_height_new} ]; then
+        o_video_width="${o_video_width_new}"
+        o_video_height="${o_video_height_new}"
+      else
+        o_video_width="${i_video_width}"
+        o_video_height="${i_video_height}"
+      fi
+    fi
+  else
     while [ -z "${resize_value}" ]
     do
       tdeEcho ${resize_value_start}
@@ -611,23 +641,40 @@ tdeAskQuestion()
     done
   fi
   if [ "${site_type}" -eq 1 -a "${account_type}" -eq 2 ]; then
-    if [ "${o_video_width}" -gt "${i_max_width}" -o "${o_video_height}" -gt "${i_max_height}" ]; then
+    if [ "${o_video_width}" -gt ${i_max_width} -o "${o_video_height}" -gt ${i_max_height} ]; then
       [ "${preset_type}" -eq 7 ] && tdeEcho $return_message{8,9} || tdeEcho $return_message{10,11}
       tdeError
     fi
   fi
+
+  # denoise
+  denoise_type=1
+  case "${denoise_type}" in
+    [1-3]) ;;
+    *)
+      tdeEcho ${denoise_start1}
+      select item in $denoise_list{1..3}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        denoise_type="${REPLY}"
+        break
+      done
+      ;;
+  esac
 
   # audio bitrate
   if [ "${preset_type}" -eq 7 ];then
     a_max_bitrate=$((${total_bitrate} - ${s_v_bitrate}))
   else
     a_max_bitrate=${total_bitrate}
-    if [ "${site_type}" -eq 2 ]; then
+    if [ "${site_type}" -eq 3 ]; then
       if [ "${audio_info[3]}" -eq 2 ]; then
         audio_bitrate="${y_stereo_bitrate}"
       else
         audio_bitrate="${y_surround_bitrate}"
       fi
+    elif [ "${site_type}" -eq 2 ]; then
+        audio_bitrate=256
     elif [ "${question_type}" -eq 1 ]; then
       if [ "${account_type}" -eq 1 ]; then
         audio_bitrate=192
@@ -705,10 +752,25 @@ tdeAskQuestion()
       ;;
     *)
       local confirm_preset0="preset_list${preset_type}"
-      local confirm_account0="confirm_account${account_type}"
+      if [ "${site_type}" -eq 1 ]; then
+        if [ "${account_type}" -eq 1 ]; then
+          local confirm_account0="confirm_account1"
+        else
+          local confirm_account0="confirm_account2"
+        fi
+      elif [ "${site_type}" -eq 2 ]; then
+        local confirm_account0="confirm_account3"
+      else
+        if [ "${account_type}" -eq 1 ]; then
+          local confirm_account0="confirm_account4"
+        else
+          local confirm_account0="confirm_account5"
+        fi
+      fi
       local confirm_player0="confirm_player${flash_type}"
       local confirm_dectype0="confirm_${dec_type}"
       local confirm_deint0="confirm_deint${deint_type}"
+      local confirm_denoise0="confirm_denoise${denoise_type}"
       if [ "${audio_bitrate}" -eq 0 ]; then
         local confirm_audio0="${confirm_no_audio}"
       else
@@ -730,6 +792,7 @@ ${confirm_dectype} : ${!confirm_dectype0}
 ${confirm_crf} : ${confirm_crf0}
 ${confirm_resize} : ${o_video_width}x${o_video_height}
 ${confirm_deint} : ${!confirm_deint0}
+${confirm_denoise} : ${!confirm_denoise0}
 ${confirm_audio} : ${confirm_audio0}
 ${confirm_t_bitrate} : ${confirm_t_bitrate0}
 EOF
@@ -767,7 +830,13 @@ EOF
     ${audio_samplingrate:-1}
     ${samplingrate_value:-44100}
     ${limit_bitrate:-2000}
+    ${denoise_type:-1}
 EOF
+}
+
+tdeFilterAppend()
+{
+  [ "$1" = "" ] && echo "$2" || echo "$1,$2"
 }
 
 # Usage: tdeVideoEncode "${input_video}"
@@ -776,18 +845,12 @@ tdeVideoEncode()
   tdeEchoS "${video_enc_announce}"
 
   # variables for video encoding
-  local use_ffmpeg=0
-  local x264_option=""
   local ffmpeg_option="-y -i $1 -an -pix_fmt yuv420p"
+  local ffmpeg_filter=""
 
-  # bt709 for youtube, bt601 for niconico if flash_type >= 2
-  # otherwise choose by o_video_height
+  # choose by o_video_height
   if [ "${out_matrix}" != "auto" ]; then
     local out_matrix="${out_matrix}"
-  elif [ "${question_info[1]}" -eq 2 ]; then
-    local out_matrix="BT.709"
-  elif [ "${question_info[7]}" -ge 2 ]; then
-    local out_matrix="BT.601"
   elif [ "${question_info[12]}" -ge 720 ]; then
     local out_matrix="BT.709"
   else
@@ -814,11 +877,9 @@ tdeVideoEncode()
   fi
   # convert colormatrix if in_matrix != out_matrix
 
-  # define use_ffmpeg
   # use ffmpeg for tdeMuxMode with a still image
   # video_info[1](video bitrate) is 0 if the source file is a still image
   if [ ${video_info[1]} -eq 0 ]; then
-    use_ffmpeg=1
     # the lower fps, the smaller file size
     # dont specify too low fps, such as 1fps, or flash player couldnt play it back accurately
     video_info[2]=10
@@ -826,339 +887,215 @@ tdeVideoEncode()
   fi
   # question_info[8] is deint_type
   if [ "${question_info[8]}" -eq 2 -o "${video_info[7]}" != "Progressive" ]; then
-    use_ffmpeg=1
-    ffmpeg_option="${ffmpeg_option} -vf yadif"
+    ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "yadif")
   fi
   # fyi ffmpeg has colormatrix filter while libav doesnt
   if [ "${in_matrix}" != "${out_matrix}" ]; then
-    use_ffmpeg=1
     if [ "${in_matrix}" = "BT.601" ]; then
-      ffmpeg_option="${ffmpeg_option} -vf colormatrix=bt601:bt709"
+      ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "colormatrix=bt601:bt709")
     else
-      ffmpeg_option="${ffmpeg_option} -vf colormatrix=bt709:bt601"
+      ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "colormatrix=bt709:bt601")
     fi
   fi
+  # resize
+  local i_width=${video_info[3]} o_width=${question_info[11]}
+  local i_height=${video_info[4]} o_height=${question_info[12]}
+  [ "$((${o_width} % 2))" -eq 1 ] && o_width=$((${o_width} + 1))
+  [ "$((${o_height} % 2))" -eq 1 ] && o_height=$((${o_height} + 1))
+  if [ "${o_width}" -ne ${i_width} -o "${o_height}" -ne ${i_height} ]; then
+    [ -z "${resize_method}" ] && resize_method="spline"
+    ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "scale=w=${o_width}:h=${o_height}:flags=${resize_method}")
+  fi
+  # denoise
+  if [ "${question_info[19]}" -eq 2 ] || [ "${question_info[19]}" -eq 1 -a "${question_info[1]}" -ne 1 ]; then
+    ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "removegrain=m0=${rg_mode}:m1=${rg_mode}:m2=${rg_mode}")
+  fi
+  # add filterchain to ffmpeg_option
+  ffmpeg_option="${ffmpeg_option} -sar 1/1 -vf ${ffmpeg_filter}"
 
   # define other options
   # round off fps and set ${keyint}
-  local keyint=$(tdeBc "${video_info[2]} + 0.5")
-  keyint=$((${keyint%.*} * 10))
-  case "${use_ffmpeg}" in
-    0)
-      # define x264 options
-      x264_option="$1 ${x264_common[*]} --keyint ${keyint}"
-      # question_info[2] is preset_type
-      if [ "${question_info[2]}" -lt 3 ]; then
-        x264_option="${x264_option} ${x264_anime[*]}"
-      elif [ "${question_info[2]}" -lt 6 ]; then
-        x264_option="${x264_option} ${x264_film[*]}"
-      fi
-      case "${question_info[2]}" in
-        1|4)
-          x264_pass="${pass_speed}"
-          x264_option="${x264_option} ${x264_low[*]}"
-          ;;
-        2|5)
-          x264_pass="${pass_balance}"
-          x264_option="${x264_option} ${x264_medium[*]}"
-          ;;
-        3|6)
-          x264_pass="${pass_quality}"
-          x264_option="${x264_option} ${x264_high[*]}"
-          ;;
-        7)
-          temp_264="$1"
-          return
-          ;;
-        8)
-          x264_pass="${pass_quality}"
-          x264_option="${x264_option} ${x264_user[*]}"
-          ;;
-        9)
-          x264_pass=0
-          ;;
-      esac
-      # economy mode for niconico
-      [ ${question_info[4]} -eq 2 ] && x264_option="${x264_option} ${x264_economy[*]}"
-      # fast decode for niconico
-      [ ${question_info[6]} -eq 1 ] && x264_option="${x264_option} ${x264_fast[*]}"
-      # avoid flash player problems
-      case ${question_info[7]} in
-        2)
-          x264_option="${x264_option} ${x264_flash1[*]}"
-          ;;
-        3)
-          x264_option="${x264_option} ${x264_flash1[*]} ${x264_flash2[*]}"
-          ;;
-      esac
-      if [ "${out_matrix}" = "BT.709" ]; then
-        x264_option="${x264_option} --colormatrix bt709"
-      else
-        x264_option="${x264_option} --colormatrix smpte170m"
-      fi
-      if [ "${full_range}" = "off" ]; then
-        x264_option="${x264_option} --range tv"
-      elif [ "${full_range}" = "on" ]; then
-        x264_option="${x264_option} --range pc"
-      else
-        x264_option="${x264_option} --range auto"
-      fi
-      # slightly reduce video bitrate
-      local x264_bitrate=$((${question_info[14]} - ${bitrate_margin}))
-      x264_option="${x264_option} -B ${x264_bitrate}"
-      # question_info[9] is resize_type
-      if [ "${question_info[9]}" -eq 1 -o "${question_info[9]}" -eq 3 ]; then
-        local resize_option="--vf resize:width=${question_info[11]},height=${question_info[12]}"
-        [ -z "${resize_method}" ] && resize_method="spline"
-        x264_option="${x264_option} ${resize_option},method=${resize_method}"
-      fi
-
-      # start video encoding
-      case "${x264_pass}" in
-        0)
-          local h264_size
-          local h264_bitrate
-          # question_info[5] is crf_type
-          if [ "${question_info[5]}" -ne 2 ]; then
-            tdeEchoS "${pass_announce10}"
-            local x264_crf="--crf ${question_info[13]}"
-            ${tool_x264} ${x264_option} ${x264_crf} -o "${temp_264}"
-            if [ -s "${temp_264}" ]; then
-              # question_info[14] is video_bitrate
-              h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-              h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
-              if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
-                tdeEchoS "${video_enc_success}"
-                return
-              fi
-            else
-              tdeEchoS $video_enc_error{1,2}
-              tdeError
-            fi
-          fi
-          tdeEchoS "${pass_announce1}"
-          tdeEchoS "${pass_announce2}"
-          ${tool_x264} ${x264_option} -p 1 -o /dev/null
-          tdeEchoS "${pass_announce3}"
-          ${tool_x264} ${x264_option} -p 3 -o "${temp_264}"
-          # auto 3pass
-          if [ -s "${temp_264}" ]; then
-            h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-            h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
-            if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
-              tdeEchoS "${video_enc_success}"
-              return
-            fi
-          fi
-          tdeEcho $pass_announce{5,6}
-          tdeEchoS "${pass_announce6}"
-          ${tool_x264} ${x264_option} -p 2 -o "${temp_264}"
-          ;;
-        1)
-          tdeEchoS "${pass_announce7}"
-          tdeEchoS "${pass_announce2}"
-          ${tool_x264} ${x264_option} -o "${temp_264}"
-          ;;
-        2)
-          tdeEchoS "${pass_announce8}"
-          tdeEchoS "${pass_announce2}"
-          ${tool_x264} ${x264_option} -p 1 -o /dev/null
-          tdeEchoS "${pass_announce3}"
-          ${tool_x264} ${x264_option} -p 2 -o "${temp_264}"
-          ;;
-        3)
-          tdeEchoS "${pass_announce9}"
-          tdeEchoS "${pass_announce2}"
-          ${tool_x264} ${x264_option} -p 1 -o /dev/null
-          tdeEchoS "${pass_announce3}"
-          ${tool_x264} ${x264_option} -p 3 -o /dev/null
-          tdeEchoS "${pass_announce4}"
-          ${tool_x264} ${x264_option} -p 2 -o "${temp_264}"
-          ;;
-      esac
-      if [ -s "${temp_264}" ]; then
-        tdeEchoS "${video_enc_success}"
-      else
-        tdeEchoS $video_enc_error{1,2}
-        tdeError
-      fi
-      ;;
-    1)
-      local libx264_option="-vcodec libx264 -passlogfile ${temp_dir}/x264.log -x264opts"
-      # define libx264 options
-      libx264_option="${libx264_option} keyint=${keyint}"
-      # colormatrix
-      if [ "${out_matrix}" = "BT.709" ]; then
-        libx264_option="${libx264_option}:colormatrix=bt709"
-      else
-        libx264_option="${libx264_option}:colormatrix=smpte170m"
-      fi
-      for item in ${ffmpeg_common[@]}
+  local keyint_base=$(tdeBc "${video_info[2]} + 0.5")
+  keyint=$((${keyint_base%.*} * 10))
+  local libx264_option="-vcodec libx264 -passlogfile ${temp_dir}/x264.log -x264opts"
+  # define libx264 options
+  libx264_option="${libx264_option} sar=1/1:keyint=${keyint}"
+  # colormatrix
+  if [ "${out_matrix}" = "BT.709" ]; then
+    libx264_option="${libx264_option}:colormatrix=bt709"
+  else
+    libx264_option="${libx264_option}:colormatrix=smpte170m"
+  fi
+  for item in ${ffmpeg_common[@]}
+  do
+    libx264_option="${libx264_option}:${item}"
+  done
+  # question_info[2] is preset_type
+  if [ "${question_info[2]}" -lt 3 ]; then
+    for item in ${ffmpeg_anime[@]}
+    do
+      libx264_option="${libx264_option}:${item}"
+    done
+  elif [ "${question_info[2]}" -lt 6 ]; then
+    for item in ${ffmpeg_film[@]}
+    do
+      libx264_option="${libx264_option}:${item}"
+    done
+  fi
+  case "${question_info[2]}" in
+    1|4)
+      x264_pass="${pass_speed}"
+      for item in ${ffmpeg_low[@]}
       do
         libx264_option="${libx264_option}:${item}"
       done
-      # question_info[2] is preset_type
-      if [ "${question_info[2]}" -lt 3 ]; then
-        for item in ${ffmpeg_anime[@]}
-        do
-          libx264_option="${libx264_option}:${item}"
-        done
-      elif [ "${question_info[2]}" -lt 6 ]; then
-        for item in ${ffmpeg_film[@]}
-        do
-          libx264_option="${libx264_option}:${item}"
-        done
-      fi
-      case "${question_info[2]}" in
-        1|4)
-          x264_pass="${pass_speed}"
-          for item in ${ffmpeg_low[@]}
-          do
-            libx264_option="${libx264_option}:${item}"
-          done
-          ;;
-        2|5)
-          x264_pass="${pass_balance}"
-          for item in ${ffmpeg_medium[@]}
-          do
-            libx264_option="${libx264_option}:${item}"
-          done
-          ;;
-        3|6)
-          x264_pass="${pass_quality}"
-          for item in ${ffmpeg_high[@]}
-          do
-            libx264_option="${libx264_option}:${item}"
-          done
-          ;;
-        7)
-          temp_264="$1"
-          return
-          ;;
-        8)
-          x264_pass="${pass_quality}"
-          for item in ${ffmpeg_user[@]}
-          do
-            libx264_option="${libx264_option}:${item}"
-          done
-          ;;
-        9)
-          x264_pass=0
-          ;;
-      esac
-      # economy mode for niconico
-      if [ ${question_info[4]} -eq 2 ]; then
-        for item in ${ffmpeg_economy[@]}
-        do
-          libx264_option="${libx264_option}:${item}"
-        done
-      fi
-      # fast decode for niconico
-      if [ ${question_info[6]} -eq 1 ]; then
-        for item in ${ffmpeg_fast[@]}
-        do
-          libx264_option="${libx264_option}:${item}"
-        done
-      fi
-      # avoid flash player problems
-      case ${question_info[7]} in
-        2)
-          ffmpeg_option="${ffmpeg_option} -flags -loop"
-          ;;
-        3)
-          ffmpeg_option="${ffmpeg_option} -flags -loop"
-          libx264_option="${libx264_option}:weightp=0"
-          ;;
-      esac
-      # slightly reduce video bitrate
-      local libx264_bitrate=$((${question_info[14]} - ${bitrate_margin}))
+      ;;
+    2|5)
+      x264_pass="${pass_balance}"
+      for item in ${ffmpeg_medium[@]}
+      do
+        libx264_option="${libx264_option}:${item}"
+      done
+      ;;
+    3|6)
+      x264_pass="${pass_quality}"
+      for item in ${ffmpeg_high[@]}
+      do
+        libx264_option="${libx264_option}:${item}"
+      done
+      ;;
+    7)
+      temp_264="$1"
+      return
+      ;;
+    8)
+      x264_pass="${pass_quality}"
+      for item in ${ffmpeg_user[@]}
+      do
+        libx264_option="${libx264_option}:${item}"
+      done
+      ;;
+    9)
+      x264_pass=0
+      ;;
+  esac
+  # economy mode for niconico
+  if [ ${question_info[4]} -eq 2 ]; then
+    for item in ${ffmpeg_economy[@]}
+    do
+      libx264_option="${libx264_option}:${item}"
+    done
+  fi
+  # fast decode for niconico
+  if [ ${question_info[6]} -eq 1 ]; then
+    for item in ${ffmpeg_fast[@]}
+    do
+      libx264_option="${libx264_option}:${item}"
+    done
+  fi
+  # youtube or niconico(new)
+  if [ ${question_info[1]} -ne 1 ]; then
+    for item in ${ffmpeg_youtube[@]}
+    do
+      libx264_option="${libx264_option}:${item}"
+    done
+  fi
+  # avoid flash player problems
+  case ${question_info[7]} in
+    2)
+      ffmpeg_option="${ffmpeg_option} -flags -loop"
+      ;;
+    3)
+      ffmpeg_option="${ffmpeg_option} -flags -loop"
+      libx264_option="${libx264_option}:weightp=0"
+      ;;
+  esac
+  # slightly reduce video bitrate
+  local libx264_bitrate=$((${question_info[14]} - ${bitrate_margin}))
 
-      # define ffmpeg options
-      local i_width=${video_info[3]} o_width=${question_info[11]}
-      local i_height=${video_info[4]} o_height=${question_info[12]}
-      [ "$((${o_width} % 2))" -eq 1 ] && o_width=$((${o_width} + 1))
-      [ "$((${o_height} % 2))" -eq 1 ] && o_height=$((${o_height} + 1))
-      if [ "${o_width}" -ne "${i_width}" -o "${o_height}" -ne "${i_height}" ]; then
-        ffmpeg_option="${ffmpeg_option} -s ${o_width}x${o_height}"
-        [ -z "${resize_method}" ] && resize_method="spline"
-        ffmpeg_option="${ffmpeg_option} -sws_flags ${resize_method}"
-      fi
-
-      # start video encoding
-      case "${x264_pass}" in
-        0)
-          local h264_size
-          local h264_bitrate
-          # question_info[5] is crf_type
-          if [ "${question_info[5]}" -ne 2 ]; then
-            tdeEchoS "${pass_announce10}"
-            local libx264_crf=":crf=${question_info[13]}"
-            ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option}${libx264_crf} "${temp_264}"
-            if [ -s "${temp_264}" ]; then
-              # question_info[14] is video_bitrate
-              h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-              h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
-              if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+  # start video encoding
+  case "${x264_pass}" in
+    0)
+      local h264_size
+      local h264_bitrate
+      # question_info[5] is crf_type
+      if [ "${question_info[5]}" -ne 2 ]; then
+        tdeEchoS "${pass_announce10}"
+        local libx264_crf=":crf=${question_info[13]}"
+        ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option}${libx264_crf} "${temp_264}"
+        if [ -s "${temp_264}" ]; then
+          # question_info[14] is video_bitrate
+          h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+          h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
+          if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
+            if [ "${question_info[1]}" -eq 2 ]; then
+              if [ "${h264_bitrate}" -ge ${bitrate_nico_new_threshold} ]; then
                 tdeEchoS "${video_enc_success}"
                 return
+              else
+                libx264_option="${libx264_option%*keyint=*}keyint=${keyint_base%.*}:${libx264_option#*keyint=*:}"
               fi
             else
-              tdeEchoS $video_enc_error{1,2}
-              tdeError
-            fi
-          fi
-          tdeEchoS "${pass_announce1}"
-          tdeEchoS "${pass_announce2}"
-          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
-          tdeEchoS "${pass_announce3}"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
-          # auto 3pass
-          if [ -s "${temp_264}" ]; then
-            h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-            h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
-            if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
               tdeEchoS "${video_enc_success}"
               return
             fi
           fi
-          tdeEcho $pass_announce{5,6}
-          tdeEchoS "${pass_announce6}"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
-          ;;
-        1)
-          tdeEchoS "${pass_announce7}"
-          tdeEchoS "${pass_announce2}"
-          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} "${temp_264}"
-          ;;
-        2)
-          tdeEchoS "${pass_announce8}"
-          tdeEchoS "${pass_announce2}"
-          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
-          tdeEchoS "${pass_announce3}"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
-          ;;
-        3)
-          tdeEchoS "${pass_announce9}"
-          tdeEchoS "${pass_announce2}"
-          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
-          tdeEchoS "${pass_announce3}"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
-          tdeEchoS "${pass_announce4}"
-          ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
-          ;;
-      esac
-      if [ -s "${temp_264}" ]; then
-        tdeEchoS "${video_enc_success}"
-      else
-        tdeEchoS $video_enc_error{1,2}
-        tdeError
+        else
+          tdeEchoS $video_enc_error{1,2}
+          tdeError
+        fi
       fi
+      tdeEchoS "${pass_announce1}"
+      tdeEchoS "${pass_announce2}"
+
+      ffmpeg_option="${ffmpeg_option} -b:v ${libx264_bitrate}k"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
+      tdeEchoS "${pass_announce3}"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
+      # auto 3pass
+      if [ -s "${temp_264}" ]; then
+        h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
+        h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
+        if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
+          tdeEchoS "${video_enc_success}"
+          return
+        fi
+      fi
+      tdeEcho $pass_announce{5,6}
+      tdeEchoS "${pass_announce6}"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
+      ;;
+    1)
+      tdeEchoS "${pass_announce7}"
+      tdeEchoS "${pass_announce2}"
+      ffmpeg_option="${ffmpeg_option} -b:v ${libx264_bitrate}k"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} "${temp_264}"
+      ;;
+    2)
+      tdeEchoS "${pass_announce8}"
+      tdeEchoS "${pass_announce2}"
+      ffmpeg_option="${ffmpeg_option} -b:v ${libx264_bitrate}k"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
+      tdeEchoS "${pass_announce3}"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
+      ;;
+    3)
+      tdeEchoS "${pass_announce9}"
+      tdeEchoS "${pass_announce2}"
+      ffmpeg_option="${ffmpeg_option} -b:v ${libx264_bitrate}k"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
+      tdeEchoS "${pass_announce3}"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
+      tdeEchoS "${pass_announce4}"
+      ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
       ;;
   esac
+  if [ -s "${temp_264}" ]; then
+    tdeEchoS "${video_enc_success}"
+  else
+    tdeEchoS $video_enc_error{1,2}
+    tdeError
+  fi
 }
 
 # Usage: tdeAudioEncode "${input_audio}"
@@ -1181,7 +1118,7 @@ tdeAudioEncode()
   # silent
   if [ "${question_info[15]}" -eq 0 -o "${audio_info[0]}" -eq 0 ]; then
     ffmpeg_pcm="${ffmpeg_pcm} -ar 44100 -f s16le"
-    ffmpeg_aac="-profile aac_he ${ffmpeg_aac} -ab 48k"
+    ffmpeg_aac="-profile aac_he ${ffmpeg_aac} -b:a 48k"
     ${tool_ffmpeg} ${ffmpeg_pcm} -i /dev/zero ${ffmpeg_aac} -t 1 "${temp_m4a}"
     return
   fi
@@ -1223,7 +1160,7 @@ tdeAudioEncode()
     else
       ffmpeg_profile="aac_low"
     fi
-    aac_option="-profile ${ffmpeg_profile} ${ffmpeg_aac} -ab ${a_bitrate}k"
+    aac_option="-profile ${ffmpeg_profile} ${ffmpeg_aac} -b:a ${a_bitrate}k"
     if [ "${a_bitrate}" -lt $((128 * ${audio_surround})) ]; then
       cutoff_value=16000
     elif [ "${a_bitrate}" -lt $((224 * ${audio_surround})) ]; then
@@ -1241,7 +1178,7 @@ tdeAudioEncode()
     local h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
     local h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
     local a_limit_bitrate=$((${question_info[18]} - ${h264_bitrate}))
-    if [ "${audio_info[1]}" -lt "${a_limit_bitrate}" ]; then
+    if [ "${audio_info[1]}" -lt ${a_limit_bitrate} ]; then
       temp_m4a="$1"
       return
     fi
@@ -1286,18 +1223,13 @@ tdeMP4()
   tdeEchoS "${mp4_announce}"
 
   # start muxing
-  if [ -n "${tool_MP4Box}" ]; then
-    [ "${question_info[2]}" -eq 7 ] || mp4_fps="-fps ${video_info[2]}"
-    ${tool_MP4Box} ${mp4_fps} -add "${temp_264}#video" -add "${temp_m4a}#audio" -new "${temp_mp4}"
+  if [ "${question_info[2]}" -eq 7 ]; then
+    ${tool_ffmpeg} -loglevel quiet -i "${temp_264}" -an -vcodec copy "${temp_dir}/video.h264"
+    temp_264="${temp_dir}/video.h264"
   else
-    if [ "${question_info[2]}" -eq 7 ]; then
-      ${tool_ffmpeg} -loglevel quiet -i "${temp_264}" -an -vcodec copy "${temp_dir}/video.h264"
-      temp_264="${temp_dir}/video.h264"
-    else
-      mp4_fps="-r ${video_info[2]}"
-    fi
-    ${tool_ffmpeg} ${mp4_fps} -i "${temp_264}" -i "${temp_m4a}" -vcodec copy -acodec copy "${temp_mp4}"
+    mp4_fps="-r ${video_info[2]}"
   fi
+  ${tool_ffmpeg} ${mp4_fps} -i "${temp_264}" -i "${temp_m4a}" -vcodec copy -acodec copy "${temp_mp4}"
 
   # backup
   [ -e "${output_mp4name}" ] && mv "${output_mp4name}" "${mp4_dir}/old.mp4"
@@ -1322,7 +1254,7 @@ tdeEnc2mp4()
   do
     question_info=($(tdeAskQuestion))
     [ "${question_info}" = "r" ] && continue
-    [ "${#question_info[*]}" -eq 19 ] && break || exit
+    [ "${#question_info[*]}" -eq 20 ] && break || exit
   done
   tdeVideoEncode "$1"
   tdeAudioEncode "$2"
@@ -1363,7 +1295,7 @@ tdeToolUpdate()
   tdeEcho $auto_install_start{1,2}
   if [ "${os}" = "Mac" ]; then
     # for mac
-    curl -o Mac.zip -L "https://drive.google.com/uc?id=0B0If6OXG2yfVVGVDV0JZN3Z5Sm8"
+    curl -o Mac.zip -L "https://drive.google.com/uc?id=0B0If6OXG2yfVU053eE1DUnBsZDA"
     if [ "$?" -eq 0 ]; then
       tdeEchoS "${auto_install_end}"
     else
@@ -1374,7 +1306,7 @@ tdeToolUpdate()
     rm Mac.zip
     # TODO: for linux and windows
   fi
-  chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
+  chmod +x ${tool_ffmpeg} ${tool_mediainfo}
 }
 
 # }}}
@@ -1439,6 +1371,7 @@ EOF
       cp -fpR TDEnc2-master/* ../
       chmod +x TDEnc2.sh ../TDEnc2.app/Contents/MacOS/droplet
       rm -rf TDEnc2-master >/dev/null 2>&1
+      tdeToolUpdate
       tdeEchoS "${update_end}"
       ./TDEnc2.sh "$@"
       exit
@@ -1450,7 +1383,7 @@ EOF
 fi
 
 # auto-install tools
-if [ ! \( -e ${tool_ffmpeg} -a -e ${tool_x264} -a -e ${tool_mediainfo} \) ]; then
+if [ ! \( -e ${tool_ffmpeg} -a -e ${tool_mediainfo} \) ]; then
   tdeToolUpdate
 fi
 
@@ -1462,23 +1395,10 @@ else
   tool_ffmpeg=$(which ${tool_ffmpeg} 2>/dev/null)
   [ -z "${tool_ffmpeg}" ] && tdeEcho $tool_error{1,2} && tdeError
 fi
-./${tool_x264} -h >/dev/null 2>&1
-if [ "$?" -eq 0 ]; then
-  tool_x264="./${tool_x264}"
-else
-  tool_x264=$(which ${tool_x264} 2>/dev/null)
-  [ -z "${tool_x264}" ] && tdeEcho $tool_error{1,2} && tdeError
-fi
-tool_x264_version=$(${tool_x264} --version | head -n1)
-if $(echo "${tool_x264_version}" | grep -ivq "${current_x264_version}"); then
-  rm ${tool_x264}
+tool_ffmpeg_version=$(${tool_ffmpeg} -version | head -n1 | cut -d' ' -f 3)
+if [ "${tool_ffmpeg_version%%[\.]*}" != '3' ]; then
+  rm ${tool_ffmpeg}
   tdeToolUpdate
-fi
-./${tool_MP4Box} -h >/dev/null 2>&1
-if [ "$?" -eq 0 ]; then
-  tool_MP4Box="./${tool_MP4Box}"
-else
-  tool_MP4Box=$(which ${tool_MP4Box} 2>/dev/null)
 fi
 mediainfo_check=($(./${tool_mediainfo} --version 2>/dev/null))
 if [ "${mediainfo_check}" = "MediaInfo" ]; then
@@ -1611,3 +1531,4 @@ esac
 # }}}
 
 # end of file. hehehe.
+
