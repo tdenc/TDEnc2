@@ -4,7 +4,9 @@ Macユーザー用の簡易FAQ
  TDEnc2の推奨環境はMac OS X 10.7以降、64bit環境です。
  TDEnc2が依存している外部ツールは以下の4つです。
  ・ffmpeg（with libx264）
+ ・MP4Box
  ・mediainfo
+ ・x264（with lavf and ffms）
  TDEnc2が動かない場合、これらをMacPortsやHomebrewでインストールし、$PATHを適切に設定してあれば、
  TDEnc2の起動時にツールがインストール先フォルダを自動で認識するので、TDEnc2が使えるようになります。
  ただ、10.6ではオーディオエンコーダとしてafconvertが使えないため、音質はよくありません。
