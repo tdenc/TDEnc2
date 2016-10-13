@@ -399,13 +399,13 @@ tdeAskQuestion()
 
   # choose account type
   if [ "${preset_type}" -ne 9 ]; then
-    account_type="${y_account_type}"
+    account_type="${n_account_type}"
     account_start1="${premium_start1}"
     account_start2="${premium_start2}"
     account_list1="${premium_list1}"
     account_list2="${premium_list2}"
   else
-    account_type="${n_account_type}"
+    account_type="${y_account_type}"
     account_start1="${premium_start3}"
     account_start2="${premium_start4}"
     account_list1="${premium_list3}"
