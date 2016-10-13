@@ -72,6 +72,7 @@ PS3=">> "
 #              [16]   audio_samplingrate  : 1-4 ( 1:44100, 2:48000, 3:96000, 4:same as source )
 #              [17]   samplingrate_value  : int
 #              [18]   limit_bitrate       : int
+#              [19]   denoise_type        : 1-3 ( 1:auto, 2:yes, 3:no )
 #                    )
 # video_info   = (
 #           [0]   Duration
@@ -277,6 +278,7 @@ tdeAskQuestion()
   local resize_value="${resize_value}"
   local audio_bitrate="${audio_bitrate}"
   local audio_samplingrate="${audio_samplingrate}"
+  local denoise_type="${denoise_type}"
   local skip_mode="${skip_mode}"
   local ret str
   local x264_pass
@@ -339,6 +341,7 @@ tdeAskQuestion()
       total_bitrate=0
       flash_type=1
       resize_type=1
+      denoise_type=1
     fi
   fi
 
@@ -617,6 +620,20 @@ tdeAskQuestion()
     fi
   fi
 
+  # denoise
+  case "${denoise_type}" in
+    [1-3]) ;;
+    *)
+      tdeEcho ${denoise_start1}
+      select item in $denoise_list{1..3}
+      do
+        [ -z "${item}" ] && tdeEcho ${return_message1} && continue
+        denoise_type="${REPLY}"
+        break
+      done
+      ;;
+  esac
+
   # audio bitrate
   if [ "${preset_type}" -eq 7 ];then
     a_max_bitrate=$((${total_bitrate} - ${s_v_bitrate}))
@@ -709,6 +726,7 @@ tdeAskQuestion()
       local confirm_player0="confirm_player${flash_type}"
       local confirm_dectype0="confirm_${dec_type}"
       local confirm_deint0="confirm_deint${deint_type}"
+      local confirm_denoise0="confirm_denoise${denoise_type}"
       if [ "${audio_bitrate}" -eq 0 ]; then
         local confirm_audio0="${confirm_no_audio}"
       else
@@ -730,6 +748,7 @@ ${confirm_dectype} : ${!confirm_dectype0}
 ${confirm_crf} : ${confirm_crf0}
 ${confirm_resize} : ${o_video_width}x${o_video_height}
 ${confirm_deint} : ${!confirm_deint0}
+${confirm_denoise} : ${!confirm_denoise0}
 ${confirm_audio} : ${confirm_audio0}
 ${confirm_t_bitrate} : ${confirm_t_bitrate0}
 EOF
@@ -767,6 +786,7 @@ EOF
     ${audio_samplingrate:-1}
     ${samplingrate_value:-44100}
     ${limit_bitrate:-2000}
+    ${denoise_type:-1}
 EOF
 }
 
@@ -848,6 +868,11 @@ tdeVideoEncode()
   ffmpeg_option="${ffmpeg_option} -vf ${ffmpeg_filter}"
 
   # define other options
+  # denoise
+  local denoise
+  if [ "${question_info[19]}" -eq 2 ] || [ "${question_info[19]}" -eq 1 -a "${question_info[1]}" -ne 1 ]; then
+    denoise=1
+  fi
   # round off fps and set ${keyint}
   local keyint=$(tdeBc "${video_info[2]} + 0.5")
   keyint=$((${keyint%.*} * 10))
@@ -860,6 +885,9 @@ tdeVideoEncode()
         x264_option="${x264_option} ${x264_anime[*]}"
       elif [ "${question_info[2]}" -lt 6 ]; then
         x264_option="${x264_option} ${x264_film[*]}"
+      fi
+      if [ "denoise" -eq 1 ]; then
+        x264_option="${x264_option} ${x264_denoise[*]}"
       fi
       case "${question_info[2]}" in
         1|4)
@@ -1013,6 +1041,12 @@ tdeVideoEncode()
         done
       elif [ "${question_info[2]}" -lt 6 ]; then
         for item in ${ffmpeg_film[@]}
+        do
+          libx264_option="${libx264_option}:${item}"
+        done
+      fi
+      if [ "denoise" -eq 1 ]; then
+        for item in ${ffmpeg_denoise[@]}
         do
           libx264_option="${libx264_option}:${item}"
         done
@@ -1330,7 +1364,7 @@ tdeEnc2mp4()
   do
     question_info=($(tdeAskQuestion))
     [ "${question_info}" = "r" ] && continue
-    [ "${#question_info[*]}" -eq 19 ] && break || exit
+    [ "${#question_info[*]}" -eq 20 ] && break || exit
   done
   tdeVideoEncode "$1"
   tdeAudioEncode "$2"

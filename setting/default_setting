@@ -54,6 +54,7 @@ flash_type=
 deint_type=
 resize_type=
 resize_value=
+denoise_type=
 audio_bitrate=
 audio_samplingrate=
 skip_mode=
