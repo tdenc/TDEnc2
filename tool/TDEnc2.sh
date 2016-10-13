@@ -770,6 +770,11 @@ EOF
 EOF
 }
 
+tdeFilterAppend()
+{
+  [ "$1" = "" ] && echo "$2" || echo "$1,$2"
+}
+
 # Usage: tdeVideoEncode "${input_video}"
 tdeVideoEncode()
 {
@@ -779,6 +784,7 @@ tdeVideoEncode()
   local use_ffmpeg=0
   local x264_option=""
   local ffmpeg_option="-y -i $1 -an -pix_fmt yuv420p"
+  local ffmpeg_filter=""
 
   # bt709 for youtube, bt601 for niconico if flash_type >= 2
   # otherwise choose by o_video_height
@@ -827,17 +833,19 @@ tdeVideoEncode()
   # question_info[8] is deint_type
   if [ "${question_info[8]}" -eq 2 -o "${video_info[7]}" != "Progressive" ]; then
     use_ffmpeg=1
-    ffmpeg_option="${ffmpeg_option} -vf yadif"
+    ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "yadif")
   fi
   # fyi ffmpeg has colormatrix filter while libav doesnt
   if [ "${in_matrix}" != "${out_matrix}" ]; then
     use_ffmpeg=1
     if [ "${in_matrix}" = "BT.601" ]; then
-      ffmpeg_option="${ffmpeg_option} -vf colormatrix=bt601:bt709"
+      ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "colormatrix=bt601:bt709")
     else
-      ffmpeg_option="${ffmpeg_option} -vf colormatrix=bt709:bt601"
+      ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "colormatrix=bt709:bt601")
     fi
   fi
+  # add filterchain to ffmpeg_option
+  ffmpeg_option="${ffmpeg_option} -vf ${ffmpeg_filter}"
 
   # define other options
   # round off fps and set ${keyint}
@@ -1109,7 +1117,7 @@ tdeVideoEncode()
           fi
           tdeEchoS "${pass_announce1}"
           tdeEchoS "${pass_announce2}"
-          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
+          ffmpeg_option="${ffmpeg_option} -b:v ${libx264_bitrate}k"
           ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
           tdeEchoS "${pass_announce3}"
           ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
@@ -1129,13 +1137,13 @@ tdeVideoEncode()
         1)
           tdeEchoS "${pass_announce7}"
           tdeEchoS "${pass_announce2}"
-          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
+          ffmpeg_option="${ffmpeg_option} -b:v ${libx264_bitrate}k"
           ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} "${temp_264}"
           ;;
         2)
           tdeEchoS "${pass_announce8}"
           tdeEchoS "${pass_announce2}"
-          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
+          ffmpeg_option="${ffmpeg_option} -b:v ${libx264_bitrate}k"
           ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
           tdeEchoS "${pass_announce3}"
           ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 2 "${temp_264}"
@@ -1143,7 +1151,7 @@ tdeVideoEncode()
         3)
           tdeEchoS "${pass_announce9}"
           tdeEchoS "${pass_announce2}"
-          ffmpeg_option="${ffmpeg_option} -b ${libx264_bitrate}k"
+          ffmpeg_option="${ffmpeg_option} -b:v ${libx264_bitrate}k"
           ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 1 "${temp_264}"
           tdeEchoS "${pass_announce3}"
           ${tool_ffmpeg} ${ffmpeg_option} ${libx264_option} -pass 3 "${temp_264}"
@@ -1181,7 +1189,7 @@ tdeAudioEncode()
   # silent
   if [ "${question_info[15]}" -eq 0 -o "${audio_info[0]}" -eq 0 ]; then
     ffmpeg_pcm="${ffmpeg_pcm} -ar 44100 -f s16le"
-    ffmpeg_aac="-profile aac_he ${ffmpeg_aac} -ab 48k"
+    ffmpeg_aac="-profile aac_he ${ffmpeg_aac} -b:a 48k"
     ${tool_ffmpeg} ${ffmpeg_pcm} -i /dev/zero ${ffmpeg_aac} -t 1 "${temp_m4a}"
     return
   fi
@@ -1223,7 +1231,7 @@ tdeAudioEncode()
     else
       ffmpeg_profile="aac_low"
     fi
-    aac_option="-profile ${ffmpeg_profile} ${ffmpeg_aac} -ab ${a_bitrate}k"
+    aac_option="-profile ${ffmpeg_profile} ${ffmpeg_aac} -b:a ${a_bitrate}k"
     if [ "${a_bitrate}" -lt $((128 * ${audio_surround})) ]; then
       cutoff_value=16000
     elif [ "${a_bitrate}" -lt $((224 * ${audio_surround})) ]; then
