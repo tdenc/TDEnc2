@@ -53,16 +53,16 @@ PS3=">> "
 ### Data Structures ### {{{
 # i wish i could use bash 4 for associative arrays...
 # question_info    = (
-#              [0]    question_type      : 1-3 ( 1:easy, 3:difficult )
-#              [1]    site_type         : 1-2 ( 1:niconico, 2:youtube )
+#              [0]    question_type       : 1-3 ( 1:easy, 3:difficult )
+#              [1]    site_type           : 1-2 ( 1:niconico, 2:youtube )
 #              [2]    preset_type         : 1-9 ( 7:sing, 8:user-preset ,9:youtube )
 #              [3]    account_type        : 1-2 ( 1:premium, 2:normal )
 #              [4]    enc_type            : 1-2 ( 1:high, 2:economy )
-#              [5]    crf_type             : 1-3 ( 1:auto, 2:no, 3:manual )
+#              [5]    crf_type            : 1-3 ( 1:auto, 2:no, 3:manual )
 #              [6]    dec_type            : 1-2 ( 1:fast, 2:normal )
 #              [7]    flash_type          : 1-3 ( 1:normal, 3:strict )
-#              [8]    deint_type         : 1-2 ( 1:auto, 2:no, 3:force )
-#              [9]    resize_type        : 1-2 ( 1:auto, 2:no, 3:manual )
+#              [8]    deint_type          : 1-2 ( 1:auto, 2:no, 3:force )
+#              [9]    resize_type         : 1-2 ( 1:auto, 2:no, 3:manual )
 #              [10]   total_time_sec      : int
 #              [11]   o_video_width       : int
 #              [12]   o_video_height      : int
@@ -145,7 +145,7 @@ tdeEchoS()
 # Usage: tdeMin "${int1}" "${int2}" ( returns the smaller )
 tdeMin()
 {
-  [ "$1" -le "$2" ] && echo "$1" || echo "$2"
+  [ "$1" -le $2 ] && echo $1 || echo $2
 }
 
 # Usage: tdeBc "${float1} + ${float2}" ( returns the result )
@@ -488,7 +488,7 @@ tdeAskQuestion()
   fi
 
   # crf encode
-  [ "${total_bitrate}" -lt "${bitrate_threshold}" ] && crf_type=2
+  [ "${total_bitrate}" -lt ${bitrate_threshold} ] && crf_type=2
   [ -n "${crf_value}" ] && crf_type=3
   case "${crf_type}" in
     [1-3]) ;;
@@ -611,7 +611,7 @@ tdeAskQuestion()
     done
   fi
   if [ "${site_type}" -eq 1 -a "${account_type}" -eq 2 ]; then
-    if [ "${o_video_width}" -gt "${i_max_width}" -o "${o_video_height}" -gt "${i_max_height}" ]; then
+    if [ "${o_video_width}" -gt ${i_max_width} -o "${o_video_height}" -gt ${i_max_height} ]; then
       [ "${preset_type}" -eq 7 ] && tdeEcho $return_message{8,9} || tdeEcho $return_message{10,11}
       tdeError
     fi
@@ -1249,7 +1249,7 @@ tdeAudioEncode()
     local h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
     local h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
     local a_limit_bitrate=$((${question_info[18]} - ${h264_bitrate}))
-    if [ "${audio_info[1]}" -lt "${a_limit_bitrate}" ]; then
+    if [ "${audio_info[1]}" -lt ${a_limit_bitrate} ]; then
       temp_m4a="$1"
       return
     fi
