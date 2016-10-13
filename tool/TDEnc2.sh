@@ -1547,6 +1547,7 @@ EOF
       cp -fpR TDEnc2-master/* ../
       chmod +x TDEnc2.sh ../TDEnc2.app/Contents/MacOS/droplet
       rm -rf TDEnc2-master >/dev/null 2>&1
+      tdeToolUpdate
       tdeEchoS "${update_end}"
       ./TDEnc2.sh "$@"
       exit
