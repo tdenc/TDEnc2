@@ -54,7 +54,7 @@ PS3=">> "
 # i wish i could use bash 4 for associative arrays...
 # question_info    = (
 #              [0]    question_type       : 1-3 ( 1:easy, 3:difficult )
-#              [1]    site_type           : 1-2 ( 1:niconico, 2:youtube )
+#              [1]    site_type           : 1-3 ( 1:niconico(old), 2:niconico(new), 3:youtube )
 #              [2]    preset_type         : 1-9 ( 7:sing, 8:user-preset ,9:youtube )
 #              [3]    account_type        : 1-2 ( 1:premium, 2:normal )
 #              [4]    enc_type            : 1-2 ( 1:high, 2:economy )
@@ -296,6 +296,8 @@ tdeAskQuestion()
         p_temp_bitrate=${p_temp_bitrate%%[\.]*}
   local i_temp_bitrate=$(tdeBc "${size_normal} * 1024 * 8 / ${total_time_sec}")
         i_temp_bitrate=${i_temp_bitrate%%[\.]*}
+  local p_temp_bitrate_new=$(tdeBc "${size_premium_new} * 1024 * 8 / ${total_time_sec}")
+        p_temp_bitrate_new=${p_temp_bitrate_new%%[\.]*}
   local y_p_temp_bitrate=$(tdeBc "${size_youtube_partner} * 1024 * 8 / ${total_time_sec}")
         y_p_temp_bitrate=${y_p_temp_bitrate%%[\.]*}
   local y_i_temp_bitrate=$(tdeBc "${size_youtube_normal} * 1024 * 8 / ${total_time_sec}")
@@ -306,13 +308,19 @@ tdeAskQuestion()
   local o_video_height=$((${auto_height} + ${auto_height} % 2))
   local i_video_width=$(tdeBc "${video_info[3]} * ${video_info[6]}")
         i_video_width=${i_video_width%%[\.]*}
+        i_video_width=$((${i_video_width} + ${i_video_width} % 2))
   if [ -n "${auto_width}" ]; then
     local o_video_width=$((${auto_width} + ${auto_width} % 2))
   else
     local o_video_width=$(tdeBc "${auto_height} * ${i_video_width} / ${video_info[4]}")
-    o_video_width=${o_video_width%%[\.]*}
-    o_video_width=$((${o_video_width} + ${o_video_width} % 2))
+          o_video_width=${o_video_width%%[\.]*}
+          o_video_width=$((${o_video_width} + ${o_video_width} % 2))
   fi
+  local o_video_height_new=$((${auto_height_new} + ${auto_height_new} % 2))
+        o_video_height_new=${o_video_height_new%%[\.]*}
+  local o_video_width_new=$(tdeBc "${auto_height_new} * ${i_video_width} / ${video_info[4]}")
+        o_video_width_new=${o_video_width_new%%[\.]*}
+        o_video_width_new=$((${o_video_width_new} + ${o_video_width_new} % 2))
 
   # start question
   tdeEcho $question_start{1,2}
@@ -347,10 +355,10 @@ tdeAskQuestion()
 
   # upload site
   case "${site_type}" in
-    1|2) ;;
+    1|2|3) ;;
     *)
       tdeEcho "${site_type_start}"
-      select item in "NicoNico" "YouTube"
+      select item in "NicoNico(old)" "NicoNico(new)" "YouTube"
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
         site_type="${REPLY}"
@@ -359,6 +367,14 @@ tdeAskQuestion()
       ;;
   esac
   if [ "${site_type}" -eq 2 ]; then
+    y_account_type=1
+    preset_type=9
+    audio_samplingrate=1
+    enc_type=1
+    crf_type=1
+    dec_type=2
+    flash_type=1
+  elif [ "${site_type}" -eq 3 ]; then
     preset_type=9
     audio_samplingrate=2
     enc_type=1
@@ -454,7 +470,7 @@ tdeAskQuestion()
   fi
 
   # total bitrate
-  if [ "${site_type}" -eq 2 ]; then
+  if [ "${site_type}" -eq 3 ]; then
     if [ "${account_type}" -eq 1 ]; then
       total_bitrate="${y_p_temp_bitrate}"
       limit_bitrate="${y_p_temp_bitrate}"
@@ -462,6 +478,9 @@ tdeAskQuestion()
       total_bitrate="${y_i_temp_bitrate}"
       limit_bitrate="${y_i_temp_bitrate}"
     fi
+  elif [ "${site_type}" -eq 2 ]; then
+    total_bitrate="${p_temp_bitrate_new}"
+    limit_bitrate="${p_temp_bitrate_new}"
   else
     if [ "${account_type}" -eq 1 ]; then
       limit_bitrate="${p_temp_bitrate}"
@@ -507,7 +526,7 @@ tdeAskQuestion()
   esac
   case "${crf_type}" in
     1)
-      if [ "${site_type}" -eq 2 ]; then
+      if [ "${site_type}" -ne 1 ]; then
         crf_value="${crf_you}"
       elif [ "${account_type}" -eq 1 ]; then
         crf_value="${crf_high}"
@@ -592,7 +611,17 @@ tdeAskQuestion()
   if [ "${resize_type}" -eq 2 ]; then
     o_video_width="${i_video_width}"
     o_video_height="${i_video_height}"
-  elif [ "${resize_type}" -eq 3 ]; then
+  elif [ "${resize_type}" -eq 1 ]; then
+    if [ "${site_type}" -eq 2 ];then
+      if [ "${i_video_height}" -lt ${o_video_height_new} ]; then
+        o_video_width="${o_video_width_new}"
+        o_video_height="${o_video_height_new}"
+      else
+        o_video_width="${i_video_width}"
+        o_video_height="${i_video_height}"
+      fi
+    fi
+  else
     while [ -z "${resize_value}" ]
     do
       tdeEcho ${resize_value_start}
@@ -639,12 +668,14 @@ tdeAskQuestion()
     a_max_bitrate=$((${total_bitrate} - ${s_v_bitrate}))
   else
     a_max_bitrate=${total_bitrate}
-    if [ "${site_type}" -eq 2 ]; then
+    if [ "${site_type}" -eq 3 ]; then
       if [ "${audio_info[3]}" -eq 2 ]; then
         audio_bitrate="${y_stereo_bitrate}"
       else
         audio_bitrate="${y_surround_bitrate}"
       fi
+    elif [ "${site_type}" -eq 2 ]; then
+        audio_bitrate=256
     elif [ "${question_type}" -eq 1 ]; then
       if [ "${account_type}" -eq 1 ]; then
         audio_bitrate=192
@@ -722,7 +753,21 @@ tdeAskQuestion()
       ;;
     *)
       local confirm_preset0="preset_list${preset_type}"
-      local confirm_account0="confirm_account${account_type}"
+      if [ "${site_type}" -eq 1 ]; then
+        if [ "${account_type}" -eq 1 ]; then
+          local confirm_account0="confirm_account1"
+        else
+          local confirm_account0="confirm_account2"
+        fi
+      elif [ "${site_type}" -eq 2 ]; then
+        local confirm_account0="confirm_account3"
+      else
+        if [ "${account_type}" -eq 1 ]; then
+          local confirm_account0="confirm_account4"
+        else
+          local confirm_account0="confirm_account5"
+        fi
+      fi
       local confirm_player0="confirm_player${flash_type}"
       local confirm_dectype0="confirm_${dec_type}"
       local confirm_deint0="confirm_deint${deint_type}"
@@ -806,14 +851,9 @@ tdeVideoEncode()
   local ffmpeg_option="-y -i $1 -an -pix_fmt yuv420p"
   local ffmpeg_filter=""
 
-  # bt709 for youtube, bt601 for niconico if flash_type >= 2
-  # otherwise choose by o_video_height
+  # choose by o_video_height
   if [ "${out_matrix}" != "auto" ]; then
     local out_matrix="${out_matrix}"
-  elif [ "${question_info[1]}" -eq 2 ]; then
-    local out_matrix="BT.709"
-  elif [ "${question_info[7]}" -ge 2 ]; then
-    local out_matrix="BT.601"
   elif [ "${question_info[12]}" -ge 720 ]; then
     local out_matrix="BT.709"
   else
@@ -864,8 +904,17 @@ tdeVideoEncode()
       ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "colormatrix=bt709:bt601")
     fi
   fi
+  # resize
+  [ -z "${resize_method}" ] && resize_method="spline"
+  local i_width=${video_info[3]} o_width=${question_info[11]}
+  local i_height=${video_info[4]} o_height=${question_info[12]}
+  [ "$((${o_width} % 2))" -eq 1 ] && o_width=$((${o_width} + 1))
+  [ "$((${o_height} % 2))" -eq 1 ] && o_height=$((${o_height} + 1))
+  if [ "${o_width}" -ne ${i_width} -o "${o_height}" -ne ${i_height} ]; then
+    ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "scale=w=${o_width}:h=${o_height}:flags=${resize_method}")
+  fi
   # add filterchain to ffmpeg_option
-  ffmpeg_option="${ffmpeg_option} -vf ${ffmpeg_filter}"
+  ffmpeg_option="${ffmpeg_option} -sar 1/1 -vf ${ffmpeg_filter}"
 
   # define other options
   # denoise
@@ -918,6 +967,8 @@ tdeVideoEncode()
       [ ${question_info[4]} -eq 2 ] && x264_option="${x264_option} ${x264_economy[*]}"
       # fast decode for niconico
       [ ${question_info[6]} -eq 1 ] && x264_option="${x264_option} ${x264_fast[*]}"
+      # youtube or niconico(new)
+      [ ${question_info[1]} -ne 1 ] && x264_option="${x264_option} ${x264_youtube[*]}"
       # avoid flash player problems
       case ${question_info[7]} in
         2)
@@ -964,8 +1015,12 @@ tdeVideoEncode()
               h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
               h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
               if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
-                tdeEchoS "${video_enc_success}"
-                return
+                if [ "${question_info[1]}" -eq 2 ]; then
+                  if [ "${h264_bitrate}" -ge ${bitrate_nico_new_threshold} ]; then
+                    tdeEchoS "${video_enc_success}"
+                    return
+                  else
+                    x264_option="${x264_option%*--keyint *} --keyint ${keyint_base%.*} -${x264_option#*--keyint *-}"
               fi
             else
               tdeEchoS $video_enc_error{1,2}
@@ -1022,7 +1077,7 @@ tdeVideoEncode()
     1)
       local libx264_option="-vcodec libx264 -passlogfile ${temp_dir}/x264.log -x264opts"
       # define libx264 options
-      libx264_option="${libx264_option} keyint=${keyint}"
+      libx264_option="${libx264_option} sar=1/1:keyint=${keyint}"
       # colormatrix
       if [ "${out_matrix}" = "BT.709" ]; then
         libx264_option="${libx264_option}:colormatrix=bt709"
@@ -1102,6 +1157,13 @@ tdeVideoEncode()
           libx264_option="${libx264_option}:${item}"
         done
       fi
+      # youtube or niconico(new)
+      if [ ${question_info[1]} -ne 1 ]; then
+        for item in ${ffmpeg_youtube[@]}
+        do
+          libx264_option="${libx264_option}:${item}"
+        done
+      fi
       # avoid flash player problems
       case ${question_info[7]} in
         2)
@@ -1141,8 +1203,12 @@ tdeVideoEncode()
               h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
               h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
               if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
-                tdeEchoS "${video_enc_success}"
-                return
+                if [ "${question_info[1]}" -eq 2 ]; then
+                  if [ "${h264_bitrate}" -ge ${bitrate_nico_new_threshold} ]; then
+                    tdeEchoS "${video_enc_success}"
+                    return
+                  else
+                    libx264_option="${libx264_option%*keyint=*}keyint=${keyint_base%.*}:${libx264_option#*keyint=*:}"
               fi
             else
               tdeEchoS $video_enc_error{1,2}
