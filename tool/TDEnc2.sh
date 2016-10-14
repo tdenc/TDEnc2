@@ -935,7 +935,7 @@ tdeVideoEncode()
       elif [ "${question_info[2]}" -lt 6 ]; then
         x264_option="${x264_option} ${x264_film[*]}"
       fi
-      if [ "denoise" -eq 1 ]; then
+      if [ "${denoise}" -eq 1 ]; then
         x264_option="${x264_option} ${x264_denoise[*]}"
       fi
       case "${question_info[2]}" in
@@ -1014,13 +1014,15 @@ tdeVideoEncode()
               # question_info[14] is video_bitrate
               h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
               h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
-              if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+              if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
                 if [ "${question_info[1]}" -eq 2 ]; then
                   if [ "${h264_bitrate}" -ge ${bitrate_nico_new_threshold} ]; then
                     tdeEchoS "${video_enc_success}"
                     return
                   else
                     x264_option="${x264_option%*--keyint *} --keyint ${keyint_base%.*} -${x264_option#*--keyint *-}"
+                  fi
+                fi
               fi
             else
               tdeEchoS $video_enc_error{1,2}
@@ -1036,7 +1038,7 @@ tdeVideoEncode()
           if [ -s "${temp_264}" ]; then
             h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
             h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
-            if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+            if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
               tdeEchoS "${video_enc_success}"
               return
             fi
@@ -1202,13 +1204,15 @@ tdeVideoEncode()
               # question_info[14] is video_bitrate
               h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
               h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
-              if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+              if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
                 if [ "${question_info[1]}" -eq 2 ]; then
                   if [ "${h264_bitrate}" -ge ${bitrate_nico_new_threshold} ]; then
                     tdeEchoS "${video_enc_success}"
                     return
                   else
                     libx264_option="${libx264_option%*keyint=*}keyint=${keyint_base%.*}:${libx264_option#*keyint=*:}"
+                  fi
+                fi
               fi
             else
               tdeEchoS $video_enc_error{1,2}
@@ -1225,7 +1229,7 @@ tdeVideoEncode()
           if [ -s "${temp_264}" ]; then
             h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
             h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
-            if [ "${h264_bitrate}" -le "${question_info[14]}" ]; then
+            if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
               tdeEchoS "${video_enc_success}"
               return
             fi
