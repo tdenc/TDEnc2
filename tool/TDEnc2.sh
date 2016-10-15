@@ -1102,7 +1102,7 @@ tdeVideoEncode()
           libx264_option="${libx264_option}:${item}"
         done
       fi
-      if [ "denoise" -eq 1 ]; then
+      if [ "${denoise}" -eq 1 ]; then
         for item in ${ffmpeg_denoise[@]}
         do
           libx264_option="${libx264_option}:${item}"
