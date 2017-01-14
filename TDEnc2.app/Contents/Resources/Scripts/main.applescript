@@ -1,13 +1,15 @@
 on open TDEnc2 -- if items dropped
 	-- for Sierra's AppTranslocation
 	set appFile to (path to me)
-	set tempPath to (path to home folder)
+	set homePath to (path to home folder)
 	tell application "Finder"
 		set appPath to appFile's container
-		set tempFile to (move appFile to tempPath) as alias
-		move tempFile to appPath
+		set tempPath to (appPath as text) & "tool:temp"
+		if not (exists tempPath) then
+			set tempFile to (move appFile to homePath) as alias
+			move tempFile to appPath
+		end if
 	end tell
-
 	set args to ""
 	repeat with droppedFile in TDEnc2
 		set filePath to POSIX path of droppedFile
