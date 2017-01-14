@@ -316,11 +316,18 @@ tdeAskQuestion()
           o_video_width=${o_video_width%%[\.]*}
           o_video_width=$((${o_video_width} + ${o_video_width} % 2))
   fi
-  local o_video_height_new=$((${auto_height_new} + ${auto_height_new} % 2))
-        o_video_height_new=${o_video_height_new%%[\.]*}
-  local o_video_width_new=$(tdeBc "${auto_height_new} * ${i_video_width} / ${video_info[4]}")
-        o_video_width_new=${o_video_width_new%%[\.]*}
-        o_video_width_new=$((${o_video_width_new} + ${o_video_width_new} % 2))
+  local o_video_height_new_h=$((${auto_height_new_h} + ${auto_height_new_h} % 2))
+  local o_video_width_new_h=$(tdeBc "${auto_height_new_h} * ${i_video_width} / ${video_info[4]}")
+        o_video_width_new_h=${o_video_width_new_h%%[\.]*}
+        o_video_width_new_h=$((${o_video_width_new_h} + ${o_video_width_new_h} % 2))
+  local o_video_height_new_m=$((${auto_height_new_m} + ${auto_height_new_m} % 2))
+  local o_video_width_new_m=$(tdeBc "${auto_height_new_m} * ${i_video_width} / ${video_info[4]}")
+        o_video_width_new_m=${o_video_width_new_m%%[\.]*}
+        o_video_width_new_m=$((${o_video_width_new_m} + ${o_video_width_new_m} % 2))
+  local o_video_height_new_l=$((${auto_height_new_l} + ${auto_height_new_l} % 2))
+  local o_video_width_new_l=$(tdeBc "${auto_height_new_l} * ${i_video_width} / ${video_info[4]}")
+        o_video_width_new_l=${o_video_width_new_l%%[\.]*}
+        o_video_width_new_l=$((${o_video_width_new_l} + ${o_video_width_new_l} % 2))
 
   # start question
   tdeEcho $question_start{1,2}
@@ -366,7 +373,11 @@ tdeAskQuestion()
       done
       ;;
   esac
-  if [ "${site_type}" -eq 2 ]; then
+  if [ "${site_type}" -eq 1 ]; then
+    if [ "${old_nico_feature}" != "true" ]; then
+      tdeEcho $premium_error{1..3} && tdeError
+    fi
+  elif [ "${site_type}" -eq 2 ]; then
     y_account_type=1
     preset_type=9
     audio_samplingrate=1
@@ -401,6 +412,7 @@ tdeAskQuestion()
   case "${preset_type}" in
     1|4)
       crf_type=2
+      denoise_type=3
       ;;
     7)
       crf_type=2
@@ -443,7 +455,7 @@ tdeAskQuestion()
       ;;
   esac
   if [ "${preset_type}" -eq 9 -a "${account_type}" -eq 2 ]; then
-    ret=$(tdeBc "${total_time_sec} >= $((15 * 60))")
+    ret=$(tdeBc "${total_time_sec} >= ${youtube_duration}")
     [ "${ret}" -eq 1 ] && tdeEcho $youtube_error{1,2} && tdeError
   fi
 
@@ -613,12 +625,15 @@ tdeAskQuestion()
     o_video_height="${i_video_height}"
   elif [ "${resize_type}" -eq 1 ]; then
     if [ "${site_type}" -eq 2 ];then
-      if [ "${i_video_height}" -lt ${o_video_height_new} ]; then
-        o_video_width="${o_video_width_new}"
-        o_video_height="${o_video_height_new}"
+      if [ "${total_time_sec}" -le ${nico_new_duration_h} ]; then
+        o_video_width=${o_video_width_new_h}
+        o_video_height=${o_video_height_new_h}
+      elif [ "${total_time_sec}" -le ${nico_new_duration_m} ]; then
+        o_video_width=${o_video_width_new_m}
+        o_video_height=${o_video_height_new_m}
       else
-        o_video_width="${i_video_width}"
-        o_video_height="${i_video_height}"
+        o_video_width=${o_video_width_new_l}
+        o_video_height=${o_video_height_new_l}
       fi
     fi
   else
@@ -675,7 +690,7 @@ tdeAskQuestion()
         audio_bitrate="${y_surround_bitrate}"
       fi
     elif [ "${site_type}" -eq 2 ]; then
-        audio_bitrate=256
+        audio_bitrate=${a_bitrate_nico_new}
     elif [ "${question_type}" -eq 1 ]; then
       if [ "${account_type}" -eq 1 ]; then
         audio_bitrate=192
@@ -925,6 +940,16 @@ tdeVideoEncode()
   # round off fps and set ${keyint}
   local keyint=$(tdeBc "${video_info[2]} + 0.5")
   keyint=$((${keyint%.*} * 10))
+  # set threshold by movie duration
+  local bitrate_nico_new_threshold
+  if [ "${question_info[10]}" -le ${nico_new_duration_h} ]; then
+    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_h}
+  elif [ "${question_info[10]}" -le ${nico_new_duration_m} ]; then
+    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_m}
+  else
+    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_l}
+  fi
+
   case "${use_ffmpeg}" in
     0)
       # define x264 options
