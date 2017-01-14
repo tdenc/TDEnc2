@@ -1,4 +1,13 @@
 on open TDEnc2 -- if items dropped
+	-- for Sierra's AppTranslocation
+	set appFile to (path to me)
+	set tempPath to (path to home folder)
+	tell application "Finder"
+		set appPath to appFile's container
+		set tempFile to (move appFile to tempPath) as alias
+		move tempFile to appPath
+	end tell
+
 	set args to ""
 	repeat with droppedFile in TDEnc2
 		set filePath to POSIX path of droppedFile
@@ -49,21 +58,23 @@ end run_command
 on activate_terminal()
 	tell application "Terminal"
 		activate
+		set win to front window
 		try
-			set current settings of front window to settings set "TDEnc2"
+			set current settings of win to settings set "TDEnc2"
 		on error
-			set number of columns of front window to 80
-			set number of rows of front window to 26
-			set cursor color of front window to "black"
-			set background color of front window to "black"
-			set normal text color of front window to "white"
-			set bold text color of front window to "white"
-			set font name of front window to "Menlo Regular"
-			set font size of front window to 14
-			set title displays device name of front window to false
-			set title displays shell path of front window to false
-			set title displays window size of front window to false
-			set custom title of front window to "TDEnc2"
+			set number of columns of win to 80
+			set number of rows of win to 26
+			set cursor color of win to "black"
+			set background color of win to "black"
+			set normal text color of win to "white"
+			set bold text color of win to "white"
+			set font name of win to "Menlo Regular"
+			set font size of win to 14
+			set title displays device name of win to false
+			set title displays shell path of win to false
+			set title displays window size of win to false
+			set custom title of win to "TDEnc2"
 		end try
 	end tell
 end activate_terminal
+
