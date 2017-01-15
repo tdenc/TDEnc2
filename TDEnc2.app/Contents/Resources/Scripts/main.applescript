@@ -4,11 +4,13 @@ on open TDEnc2 -- if items dropped
 	set homePath to (path to home folder)
 	tell application "Finder"
 		set appPath to appFile's container
-		set tempPath to (appPath as text) & "tool:temp"
-		if not (exists tempPath) then
+		try
+			set tempPath to (appPath as text) & "tool:temp"
+			tempPath as alias
+		on error
 			set tempFile to (move appFile to homePath) as alias
 			move tempFile to appPath
-		end if
+		end try
 	end tell
 	set args to ""
 	repeat with droppedFile in TDEnc2
