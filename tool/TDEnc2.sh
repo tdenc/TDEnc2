@@ -54,7 +54,7 @@ PS3=">> "
 # i wish i could use bash 4 for associative arrays...
 # question_info    = (
 #              [0]    question_type       : 1-3 ( 1:easy, 3:difficult )
-#              [1]    site_type           : 1-3 ( 1:niconico(old), 2:niconico(new), 3:youtube )
+#              [1]    site_type           : 1-4 ( 1:niconico(old), 2:niconico(new), 3:youtube, 4:twitter )
 #              [2]    preset_type         : 1-9 ( 7:sing, 8:user-preset ,9:youtube )
 #              [3]    account_type        : 1-2 ( 1:premium, 2:normal )
 #              [4]    enc_type            : 1-2 ( 1:high, 2:economy )
@@ -309,6 +309,8 @@ tdeAskQuestion()
         y_p_temp_bitrate=${y_p_temp_bitrate%%[\.]*}
   local y_i_temp_bitrate=$(tdeBc "${size_youtube_normal} * 1024 * 8 / ${total_time_sec}")
         y_i_temp_bitrate=${y_i_temp_bitrate%%[\.]*}
+  local tw_temp_bitrate=$(tdeBc "${size_twitter} * 1024 * 8 / ${total_time_sec}")
+        tw_temp_bitrate=${tw_temp_bitrate%%[\.]*}
   local s_v_bitrate=$(tdeBc "${video_info[1]} / 1000")
         s_v_bitrate=${s_v_bitrate%%[\.]*}
   local i_video_height="${video_info[4]}"
@@ -335,6 +337,10 @@ tdeAskQuestion()
   local o_video_width_new_l=$(tdeBc "${auto_height_new_l} * ${i_video_width} / ${video_info[4]}")
         o_video_width_new_l=${o_video_width_new_l%%[\.]*}
         o_video_width_new_l=$((${o_video_width_new_l} + ${o_video_width_new_l} % 2))
+  local o_video_height_twitter=$((${auto_height_twitter} + ${auto_height_twitter} % 2))
+  local o_video_width_twitter=$(tdeBc "${auto_height_twitter} * ${i_video_width} / ${video_info[4]}")
+        o_video_width_twitter=${o_video_width_twitter%%[\.]*}
+        o_video_width_twitter=$((${o_video_width_twitter} + ${o_video_width_twitter} % 2))
 
   # start question
   tdeEcho $question_start{1,2}
@@ -369,10 +375,10 @@ tdeAskQuestion()
 
   # upload site
   case "${site_type}" in
-    1|2|3) ;;
+    1|2|3|4) ;;
     *)
       tdeEcho "${site_type_start}"
-      select item in "NicoNico(old)" "NicoNico(new)" "YouTube"
+      select item in "NicoNico(old)" "NicoNico(new)" "YouTube" "Twitter"
       do
         [ -z "${item}" ] && tdeEcho ${return_message1} && continue
         site_type="${REPLY}"
@@ -400,6 +406,13 @@ tdeAskQuestion()
     dec_type=2
     resize_type=2
     flash_type=1
+  elif [ "${site_type}" -eq 4 ]; then
+    preset_type=9
+    enc_type=1
+    crf_type=1
+    dec_type=2
+    flash_type=1
+    total_bitrate=0
   fi
 
   # choose preset
@@ -436,7 +449,9 @@ tdeAskQuestion()
   esac
 
   # choose account type
-  if [ "${preset_type}" -ne 9 ]; then
+  if [ "${site_type}" -eq 4 ]; then
+    account_type=1
+  elif [ "${preset_type}" -ne 9 ]; then
     account_type="${n_account_type}"
     account_start1="${premium_start1}"
     account_start2="${premium_start2}"
@@ -464,6 +479,10 @@ tdeAskQuestion()
   if [ "${preset_type}" -eq 9 -a "${account_type}" -eq 2 ]; then
     ret=$(tdeBc "${total_time_sec} >= ${youtube_duration}")
     [ "${ret}" -eq 1 ] && tdeEcho $youtube_error{1,2} && tdeError
+  fi
+  if [ "${site_type}" -eq 4 ]; then
+    ret=$(tdeBc "${total_time_sec} >= ${twitter_duration}")
+    [ "${ret}" -eq 1 ] && tdeEcho $twitter_error{1,2} && tdeError
   fi
 
   # economy mode
@@ -497,6 +516,9 @@ tdeAskQuestion()
       total_bitrate="${y_i_temp_bitrate}"
       limit_bitrate="${y_i_temp_bitrate}"
     fi
+  elif [ "${site_type}" -eq 4 ]; then
+    total_bitrate="${tw_temp_bitrate}"
+    limit_bitrate="${tw_temp_bitrate}"
   elif [ "${site_type}" -eq 2 ]; then
     total_bitrate="${p_temp_bitrate_new}"
     limit_bitrate="${p_temp_bitrate_new}"
@@ -642,6 +664,9 @@ tdeAskQuestion()
         o_video_width=${o_video_width_new_l}
         o_video_height=${o_video_height_new_l}
       fi
+    elif [ "${site_type}" -eq 4 ];then
+      o_video_width=${o_video_width_twitter}
+      o_video_height=${o_video_height_twitter}
     fi
   else
     while [ -z "${resize_value}" ]
@@ -667,6 +692,11 @@ tdeAskQuestion()
   if [ "${site_type}" -eq 1 -a "${account_type}" -eq 2 ]; then
     if [ "${o_video_width}" -gt ${i_max_width} -o "${o_video_height}" -gt ${i_max_height} ]; then
       [ "${preset_type}" -eq 7 ] && tdeEcho $return_message{8,9} || tdeEcho $return_message{10,11}
+      tdeError
+    fi
+  elif [ "${site_type}" -eq 4 ]; then
+    if [ "${o_video_width}" -gt ${t_max_width} -o "${o_video_height}" -gt ${t_max_height} ]; then
+      tdeEcho $return_message{12,13}
       tdeError
     fi
   fi
@@ -698,6 +728,8 @@ tdeAskQuestion()
       fi
     elif [ "${site_type}" -eq 2 ]; then
         audio_bitrate=${a_bitrate_nico_new}
+    elif [ "${site_type}" -eq 4 ]; then
+        audio_bitrate=${a_bitrate_twitter}
     elif [ "${question_type}" -eq 1 ]; then
       if [ "${account_type}" -eq 1 ]; then
         audio_bitrate=192
@@ -783,6 +815,8 @@ tdeAskQuestion()
         fi
       elif [ "${site_type}" -eq 2 ]; then
         local confirm_account0="confirm_account3"
+      elif [ "${site_type}" -eq 4 ]; then
+        local confirm_account0="confirm_account6"
       else
         if [ "${account_type}" -eq 1 ]; then
           local confirm_account0="confirm_account4"
@@ -1033,6 +1067,10 @@ tdeVideoEncode()
         [ -z "${resize_method}" ] && resize_method="spline"
         x264_option="${x264_option} ${resize_option},method=${resize_method}"
       fi
+      # twitter
+      if [ "${question_info[1]}" -eq 4 ]; then
+        x264_option="${x264_option} ${x264_twitter[*]}"
+      fi
 
       # start video encoding
       case "${x264_pass}" in
@@ -1225,6 +1263,10 @@ tdeVideoEncode()
         ffmpeg_option="${ffmpeg_option} -s ${o_width}x${o_height}"
         [ -z "${resize_method}" ] && resize_method="spline"
         ffmpeg_option="${ffmpeg_option} -sws_flags ${resize_method}"
+      fi
+      # twitter
+      if [ "${question_info[1]}" -eq 4 ]; then
+        ffmpeg_option="${ffmpeg_option} ${ffmpeg_twitter[*]}"
       fi
 
       # start video encoding
