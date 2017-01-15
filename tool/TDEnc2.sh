@@ -149,6 +149,12 @@ tdeMin()
   [ "$1" -le $2 ] && echo $1 || echo $2
 }
 
+# Usage: tdeMax "${int1}" "${int2}" ( returns the larger )
+tdeMax()
+{
+  [ "$1" -ge $2 ] && echo $1 || echo $2
+}
+
 # Usage: tdeBc "${float1} + ${float2}" ( returns the result )
 #        tdeBc "${float1} > ${float2}" ( returns 1 if true, 0 if false )
 tdeBc()
@@ -291,7 +297,8 @@ tdeAskQuestion()
   local confirm_end
 
   # additional variables for bitrate and video resolution
-  local total_time_sec=$(( (${video_info[0]} + 500) / 1000 ))
+  local total_time_sec=$(tdeMax "${video_info[0]}" "${audio_info[0]}")
+        total_time_sec=$(( (${total_time_sec} + 500) / 1000 ))
   local p_temp_bitrate=$(tdeBc "${size_premium} * 1024 * 8 / ${total_time_sec}")
         p_temp_bitrate=${p_temp_bitrate%%[\.]*}
   local i_temp_bitrate=$(tdeBc "${size_normal} * 1024 * 8 / ${total_time_sec}")
@@ -936,10 +943,12 @@ tdeVideoEncode()
   local denoise
   if [ "${question_info[19]}" -eq 2 ] || [ "${question_info[19]}" -eq 1 -a "${question_info[1]}" -ne 1 ]; then
     denoise=1
+  else
+    denoise=0
   fi
   # round off fps and set ${keyint}
-  local keyint=$(tdeBc "${video_info[2]} + 0.5")
-  keyint=$((${keyint%.*} * 10))
+  local keyint_base=$(tdeBc "${video_info[2]} + 0.5")
+  local keyint=$((${keyint_base%.*} * 10))
   # set threshold by movie duration
   local bitrate_nico_new_threshold
   if [ "${question_info[10]}" -le ${nico_new_duration_h} ]; then
@@ -1020,7 +1029,7 @@ tdeVideoEncode()
       x264_option="${x264_option} -B ${x264_bitrate}"
       # question_info[9] is resize_type
       if [ "${question_info[9]}" -eq 1 -o "${question_info[9]}" -eq 3 ]; then
-        local resize_option="--vf resize:width=${question_info[11]},height=${question_info[12]}"
+        local resize_option="--vf resize:width=${question_info[11]},height=${question_info[12]},sar=1:1"
         [ -z "${resize_method}" ] && resize_method="spline"
         x264_option="${x264_option} ${resize_option},method=${resize_method}"
       fi
@@ -1038,7 +1047,7 @@ tdeVideoEncode()
             if [ -s "${temp_264}" ]; then
               # question_info[14] is video_bitrate
               h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-              h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
+              h264_bitrate=$((${h264_size} * 8 / 1024 / ${question_info[10]}))
               if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
                 if [ "${question_info[1]}" -eq 2 ]; then
                   if [ "${h264_bitrate}" -ge ${bitrate_nico_new_threshold} ]; then
@@ -1047,6 +1056,9 @@ tdeVideoEncode()
                   else
                     x264_option="${x264_option%*--keyint *} --keyint ${keyint_base%.*} -${x264_option#*--keyint *-}"
                   fi
+                else
+                  tdeEchoS "${video_enc_success}"
+                  return
                 fi
               fi
             else
@@ -1062,7 +1074,7 @@ tdeVideoEncode()
           # auto 3pass
           if [ -s "${temp_264}" ]; then
             h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-            h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
+            h264_bitrate=$((${h264_size} * 8 / 1024 / ${question_info[10]}))
             if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
               tdeEchoS "${video_enc_success}"
               return
@@ -1228,7 +1240,7 @@ tdeVideoEncode()
             if [ -s "${temp_264}" ]; then
               # question_info[14] is video_bitrate
               h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-              h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
+              h264_bitrate=$((${h264_size} * 8 / 1024 / ${question_info[10]}))
               if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
                 if [ "${question_info[1]}" -eq 2 ]; then
                   if [ "${h264_bitrate}" -ge ${bitrate_nico_new_threshold} ]; then
@@ -1237,6 +1249,9 @@ tdeVideoEncode()
                   else
                     libx264_option="${libx264_option%*keyint=*}keyint=${keyint_base%.*}:${libx264_option#*keyint=*:}"
                   fi
+                else
+                  tdeEchoS "${video_enc_success}"
+                  return
                 fi
               fi
             else
@@ -1253,7 +1268,7 @@ tdeVideoEncode()
           # auto 3pass
           if [ -s "${temp_264}" ]; then
             h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-            h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
+            h264_bitrate=$((${h264_size} * 8 / 1024 / ${question_info[10]}))
             if [ "${h264_bitrate}" -le ${question_info[14]} ]; then
               tdeEchoS "${video_enc_success}"
               return
@@ -1376,7 +1391,7 @@ tdeAudioEncode()
   local audio_codec=$(tdeMediaInfo -a Format "%1")
   if $(echo "${audio_codec}" | grep -iq 'AAC'); then
     local h264_size=$(tdeMediaInfo -g "FileSize" "${temp_264}")
-    local h264_bitrate=$((1000 * ${h264_size} / ${video_info[0]}))
+    local h264_bitrate=$((${h264_size} * 8 / 1024 / ${question_info[10]}))
     local a_limit_bitrate=$((${question_info[18]} - ${h264_bitrate}))
     if [ "${audio_info[1]}" -lt ${a_limit_bitrate} ]; then
       temp_m4a="$1"
