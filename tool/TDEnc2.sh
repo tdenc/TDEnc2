@@ -1557,15 +1557,15 @@ tdeToolUpdate()
   tdeEcho $auto_install_start{1,2}
   if [ "${os}" = "Mac" ]; then
     # for mac
-    curl -o Mac.zip -L "https://drive.google.com/uc?id=0B0If6OXG2yfVVGVDV0JZN3Z5Sm8"
+    [ -d "../Archives" ] || mkdir -p "../Archives" >/dev/null 2>&1
+    [ -s "../Archives/Mac.zip" ] || curl -o ../Archives/Mac.zip -L "https://raw.githubusercontent.com/tdenc/TDEnc2/master/Archives/Mac.zip"
     if [ "$?" -eq 0 ]; then
       tdeEchoS "${auto_install_end}"
     else
       tdeEcho $auto_install_error{1,2}
       tdeError
     fi
-    unzip -qjo Mac.zip 2>/dev/null
-    rm Mac.zip
+    unzip -qjo ../Archives/Mac.zip 2>/dev/null
     # TODO: for linux and windows
   fi
   chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
