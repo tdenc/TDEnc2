@@ -654,12 +654,14 @@ tdeAskQuestion()
     o_video_height="${i_video_height}"
   elif [ "${resize_type}" -eq 1 ]; then
     if [ "${site_type}" -eq 2 ];then
-      if [ "${total_time_sec}" -le ${nico_new_duration_h} ]; then
-        o_video_width=${o_video_width_new_h}
-        o_video_height=${o_video_height_new_h}
-      elif [ "${total_time_sec}" -le ${nico_new_duration_m} ]; then
-        o_video_width=${o_video_width_new_m}
-        o_video_height=${o_video_height_new_m}
+      if [ "${total_time_sec}" -le ${nico_new_duration_m} ]; then
+        if [ "${total_bitrate}" -lt ${bitrate_nico_new_threshold_m} ]; then
+          o_video_width=${o_video_width_new_m}
+          o_video_height=${o_video_height_new_m}
+        else
+          o_video_width=${o_video_width_new_h}
+          o_video_height=${o_video_height_new_h}
+        fi
       else
         o_video_width=${o_video_width_new_l}
         o_video_height=${o_video_height_new_l}
