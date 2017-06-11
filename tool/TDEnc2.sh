@@ -971,6 +971,18 @@ tdeVideoEncode()
   if [ "${o_width}" -ne ${i_width} -o "${o_height}" -ne ${i_height} ]; then
     ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "scale=w=${o_width}:h=${o_height}:flags=${resize_method}")
   fi
+  # fps convert
+  if [ "${question_info[1]}" -eq 4 ]; then
+    out_fps=${twitter_fps}
+  elif [ -z "${default_fps}" ]; then
+    out_fps=${default_fps}
+  else
+    out_fps=${video_info[2]}
+  fi
+  if [ "${video_info[2]}" != "${out_fps}" ]; then
+    use_ffmpeg=1
+    ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "fps=${out_fps}")
+  fi
   # add filterchain to ffmpeg_option
   ffmpeg_option="${ffmpeg_option} -sar 1/1 -vf ${ffmpeg_filter}"
 
@@ -983,7 +995,7 @@ tdeVideoEncode()
     denoise=0
   fi
   # round off fps and set ${keyint}
-  local keyint_base=$(tdeBc "${video_info[2]} + 0.5")
+  local keyint_base=$(tdeBc "${out_fps} + 0.5")
   local keyint=$((${keyint_base%.*} * 10))
   # set threshold by movie duration
   local bitrate_nico_new_threshold
@@ -1483,14 +1495,14 @@ tdeMP4()
 
   # start muxing
   if [ -n "${tool_MP4Box}" ]; then
-    [ "${question_info[2]}" -eq 7 ] || mp4_fps="-fps ${video_info[2]}"
+    [ "${question_info[2]}" -eq 7 ] || mp4_fps="-fps ${out_fps}"
     ${tool_MP4Box} ${mp4_fps} -add "${temp_264}#video" -add "${temp_m4a}#audio" -new "${temp_mp4}"
   else
     if [ "${question_info[2]}" -eq 7 ]; then
       ${tool_ffmpeg} -loglevel quiet -i "${temp_264}" -an -vcodec copy "${temp_dir}/video.h264"
       temp_264="${temp_dir}/video.h264"
     else
-      mp4_fps="-r ${video_info[2]}"
+      mp4_fps="-r ${out_fps}"
     fi
     ${tool_ffmpeg} ${mp4_fps} -i "${temp_264}" -i "${temp_m4a}" -vcodec copy -acodec copy "${temp_mp4}"
   fi
