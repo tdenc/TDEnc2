@@ -14,7 +14,7 @@ on open TDEnc2 -- if items dropped
 	set args to ""
 	repeat with droppedFile in TDEnc2
 		set filePath to POSIX path of droppedFile
-		set args to args & quote & filePath & quote
+		set args to args & space & quote & filePath & quote
 	end repeat
 	run_command(set_command(args))
 	activate_terminal()
