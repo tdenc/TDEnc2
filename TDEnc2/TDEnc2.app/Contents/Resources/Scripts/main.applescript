@@ -1,16 +1,4 @@
 on open TDEnc2 -- if items dropped
-	-- for Sierra's AppTranslocation
-	set appFile to (path to me)
-	set homePath to (path to home folder)
-	tell application "Finder"
-		set appPath to appFile's container
-		set tempPath to (appPath as text) & "tool:temp"
-		if not (exists tempPath) then
-			set tempFile to (move appFile to homePath) as alias
-			do shell script "xattr -dr com.apple.quarantine " & quote & POSIX path of tempFile & quote
-			move tempFile to appPath
-		end if
-	end tell
 	set args to ""
 	repeat with droppedFile in TDEnc2
 		set filePath to POSIX path of droppedFile
