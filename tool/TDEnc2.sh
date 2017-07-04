@@ -974,7 +974,7 @@ tdeVideoEncode()
   # fps convert
   if [ "${question_info[1]}" -eq 4 ]; then
     out_fps=${twitter_fps}
-  elif [ -z "${default_fps}" ]; then
+  elif [ -n "${default_fps}" ]; then
     out_fps=${default_fps}
   else
     out_fps=${video_info[2]}
