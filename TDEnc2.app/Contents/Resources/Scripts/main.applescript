@@ -1,19 +1,8 @@
 on open TDEnc2 -- if items dropped
-	-- for Sierra's AppTranslocation
-	set appFile to (path to me)
-	set homePath to (path to home folder)
-	tell application "Finder"
-		set appPath to appFile's container
-		set tempPath to (appPath as text) & "tool:temp"
-		if not (exists tempPath) then
-			set tempFile to (move appFile to homePath) as alias
-			move tempFile to appPath
-		end if
-	end tell
 	set args to ""
 	repeat with droppedFile in TDEnc2
 		set filePath to POSIX path of droppedFile
-		set args to args & " \"" & filePath & "\""
+		set args to args & space & quote & filePath & quote
 	end repeat
 	run_command(set_command(args))
 	activate_terminal()
@@ -28,7 +17,7 @@ on set_command(args)
 	tell application "Finder"
 		set appPath to parent of (path to current application) as text
 		set unixPath to POSIX path of appPath & "tool/TDEnc2.sh"
-		return "\"" & unixPath & "\"" & args & ";exit"
+		return quote & unixPath & quote & args & ";exit"
 	end tell
 end set_command
 
@@ -79,4 +68,3 @@ on activate_terminal()
 		end try
 	end tell
 end activate_terminal
-
