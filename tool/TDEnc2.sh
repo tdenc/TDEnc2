@@ -997,15 +997,6 @@ tdeVideoEncode()
   # round off fps and set ${keyint}
   local keyint_base=$(tdeBc "${out_fps} + 0.5")
   local keyint=$((${keyint_base%.*} * 10))
-  # set threshold by movie duration
-  local bitrate_nico_new_threshold
-  if [ "${question_info[10]}" -le ${nico_new_duration_h} ]; then
-    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_h}
-  elif [ "${question_info[10]}" -le ${nico_new_duration_m} ]; then
-    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_m}
-  else
-    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_l}
-  fi
 
   case "${use_ffmpeg}" in
     0)

@@ -18,6 +18,7 @@ bitrate_threshold=2000
 bitrate_nico_new_threshold_h=3000
 bitrate_nico_new_threshold_m=1000
 bitrate_nico_new_threshold_l=600
+bitrate_nico_new_threshold=6000
 crf_you=18
 crf_high=23
 crf_low=26
