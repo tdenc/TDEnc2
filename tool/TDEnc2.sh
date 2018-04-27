@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script and x264
-current_version="2.30"
+current_version="2.98"
 current_x264_version=2358
 
 # make a directory for temporary files
@@ -480,10 +480,6 @@ tdeAskQuestion()
     ret=$(tdeBc "${total_time_sec} >= ${youtube_duration}")
     [ "${ret}" -eq 1 ] && tdeEcho $youtube_error{1,2} && tdeError
   fi
-  if [ "${site_type}" -eq 4 ]; then
-    ret=$(tdeBc "${total_time_sec} >= ${twitter_duration}")
-    [ "${ret}" -eq 1 ] && tdeEcho $twitter_error{1,2} && tdeError
-  fi
 
   # economy mode
   case "${enc_type}" in
@@ -520,8 +516,13 @@ tdeAskQuestion()
     total_bitrate="${tw_temp_bitrate}"
     limit_bitrate="${tw_temp_bitrate}"
   elif [ "${site_type}" -eq 2 ]; then
-    total_bitrate="${p_temp_bitrate_new}"
-    limit_bitrate="${p_temp_bitrate_new}"
+    if [ "{zenza}" = "true" ]; then
+      total_bitrate="${p_temp_bitrate}"
+      limit_bitrate="${p_temp_bitrate}"
+    else
+      total_bitrate="${p_temp_bitrate_new}"
+      limit_bitrate="${p_temp_bitrate_new}"
+    fi
   else
     if [ "${account_type}" -eq 1 ]; then
       limit_bitrate="${p_temp_bitrate}"
@@ -997,15 +998,6 @@ tdeVideoEncode()
   # round off fps and set ${keyint}
   local keyint_base=$(tdeBc "${out_fps} + 0.5")
   local keyint=$((${keyint_base%.*} * 10))
-  # set threshold by movie duration
-  local bitrate_nico_new_threshold
-  if [ "${question_info[10]}" -le ${nico_new_duration_h} ]; then
-    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_h}
-  elif [ "${question_info[10]}" -le ${nico_new_duration_m} ]; then
-    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_m}
-  else
-    bitrate_nico_new_threshold=${bitrate_nico_new_threshold_l}
-  fi
 
   case "${use_ffmpeg}" in
     0)
@@ -1571,15 +1563,15 @@ tdeToolUpdate()
   tdeEcho $auto_install_start{1,2}
   if [ "${os}" = "Mac" ]; then
     # for mac
-    curl -o Mac.zip -L "https://drive.google.com/uc?id=0B0If6OXG2yfVVGVDV0JZN3Z5Sm8"
+    [ -d "../Archives" ] || mkdir -p "../Archives" >/dev/null 2>&1
+    [ -s "../Archives/Mac.zip" ] || curl -o ../Archives/Mac.zip -L "https://raw.githubusercontent.com/tdenc/TDEnc2/master/Archives/Mac.zip"
     if [ "$?" -eq 0 ]; then
       tdeEchoS "${auto_install_end}"
     else
       tdeEcho $auto_install_error{1,2}
       tdeError
     fi
-    unzip -qjo Mac.zip 2>/dev/null
-    rm Mac.zip
+    unzip -qjo ../Archives/Mac.zip 2>/dev/null
     # TODO: for linux and windows
   fi
   chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
