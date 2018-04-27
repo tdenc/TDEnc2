@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script and x264
-current_version="2.30"
+current_version="2.98"
 current_x264_version=2358
 
 # make a directory for temporary files
@@ -480,10 +480,6 @@ tdeAskQuestion()
     ret=$(tdeBc "${total_time_sec} >= ${youtube_duration}")
     [ "${ret}" -eq 1 ] && tdeEcho $youtube_error{1,2} && tdeError
   fi
-  if [ "${site_type}" -eq 4 ]; then
-    ret=$(tdeBc "${total_time_sec} >= ${twitter_duration}")
-    [ "${ret}" -eq 1 ] && tdeEcho $twitter_error{1,2} && tdeError
-  fi
 
   # economy mode
   case "${enc_type}" in
@@ -520,8 +516,13 @@ tdeAskQuestion()
     total_bitrate="${tw_temp_bitrate}"
     limit_bitrate="${tw_temp_bitrate}"
   elif [ "${site_type}" -eq 2 ]; then
-    total_bitrate="${p_temp_bitrate_new}"
-    limit_bitrate="${p_temp_bitrate_new}"
+    if [ "{zenza}" = "true" ]; then
+      total_bitrate="${p_temp_bitrate}"
+      limit_bitrate="${p_temp_bitrate}"
+    else
+      total_bitrate="${p_temp_bitrate_new}"
+      limit_bitrate="${p_temp_bitrate_new}"
+    fi
   else
     if [ "${account_type}" -eq 1 ]; then
       limit_bitrate="${p_temp_bitrate}"
