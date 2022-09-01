@@ -8,7 +8,7 @@ cd "${current_dir}"
 ### Variables ### {{{
 # version of this script and x264
 current_version="2.98"
-current_x264_version=2358
+current_x264_version=3095
 
 # make a directory for temporary files
 # use PID for multiple-running
@@ -1486,18 +1486,13 @@ tdeMP4()
   tdeEchoS "${mp4_announce}"
 
   # start muxing
-  if [ -n "${tool_MP4Box}" ]; then
-    [ "${question_info[2]}" -eq 7 ] || mp4_fps="-fps ${out_fps}"
-    ${tool_MP4Box} ${mp4_fps} -add "${temp_264}#video" -add "${temp_m4a}#audio" -new "${temp_mp4}"
+  if [ "${question_info[2]}" -eq 7 ]; then
+    ${tool_ffmpeg} -loglevel quiet -i "${temp_264}" -an -vcodec copy "${temp_dir}/video.h264"
+    temp_264="${temp_dir}/video.h264"
   else
-    if [ "${question_info[2]}" -eq 7 ]; then
-      ${tool_ffmpeg} -loglevel quiet -i "${temp_264}" -an -vcodec copy "${temp_dir}/video.h264"
-      temp_264="${temp_dir}/video.h264"
-    else
-      mp4_fps="-r ${out_fps}"
-    fi
-    ${tool_ffmpeg} ${mp4_fps} -i "${temp_264}" -i "${temp_m4a}" -vcodec copy -acodec copy "${temp_mp4}"
+    mp4_fps="-r ${out_fps}"
   fi
+  ${tool_ffmpeg} ${mp4_fps} -i "${temp_264}" -i "${temp_m4a}" -vcodec copy -acodec copy "${temp_mp4}"
 
   # backup
   [ -e "${output_mp4name}" ] && mv "${output_mp4name}" "${mp4_dir}/old.mp4"
@@ -1574,7 +1569,7 @@ tdeToolUpdate()
     unzip -qjo ../Archives/Mac.zip 2>/dev/null
     # TODO: for linux and windows
   fi
-  chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_MP4Box} ${tool_mediainfo}
+  chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_mediainfo}
 }
 
 # }}}
@@ -1674,12 +1669,6 @@ tool_x264_version=$(${tool_x264} --version | head -n1)
 if $(echo "${tool_x264_version}" | grep -ivq "${current_x264_version}"); then
   rm ${tool_x264}
   tdeToolUpdate
-fi
-./${tool_MP4Box} -h >/dev/null 2>&1
-if [ "$?" -eq 0 ]; then
-  tool_MP4Box="./${tool_MP4Box}"
-else
-  tool_MP4Box=$(which ${tool_MP4Box} 2>/dev/null)
 fi
 mediainfo_check=($(./${tool_mediainfo} --version 2>/dev/null))
 if [ "${mediainfo_check}" = "MediaInfo" ]; then

@@ -5,7 +5,6 @@ WindowsやLinuxユーザー用の簡易FAQ
  ただし、TDEnc2のコア部分はBashで書いてあるので、Bashが使用可能な環境ならば使えます。
  toolフォルダにWindows用の以下の4つのツールを入れて、コマンドラインから使用可能です。
  ・ffmpeg ( with libx264 )
- ・MP4Box
  ・mediainfo
  ・x264 ( with lavf and ffms )
  また、neroAacEnc.exeをtoolフォルダに入れればneroAacEncを使うようになっています。
@@ -13,7 +12,7 @@ WindowsやLinuxユーザー用の簡易FAQ
 
 ○LinuxでTDEnc2を使いたい
  上記のようにコア部分をBashで書いたので、Linuxでも使用できます。
- apt-getやyumなどを利用して、システムにffmpeg、MP4Box、mediainfo、x264を入れてください。
+ apt-getやyumなどを利用して、システムにffmpeg、mediainfo、x264を入れてください。
  ffmpegはlibx264つきで、x264はlavfとffmsつきでコンパイルしてください。
  なお、neroAacEncはLinux版も存在し、ffmpegより高音質でエンコードできます。
  toolフォルダに入れればneroAacEncを使うようになっていますので、そちらの機能もどうぞ。
