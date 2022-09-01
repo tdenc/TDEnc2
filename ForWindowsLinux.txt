@@ -6,7 +6,6 @@ WindowsやLinuxユーザー用の簡易FAQ
  toolフォルダにWindows用の以下の4つのツールを入れて、コマンドラインから使用可能です。
  ・ffmpeg ( with libx264 )
  ・mediainfo
- ・x264 ( with lavf and ffms )
  また、neroAacEnc.exeをtoolフォルダに入れればneroAacEncを使うようになっています。
  デフォルトではffmpegですので、音質が気になる場合はneroAacEncを自分でインストールしてください。
 
