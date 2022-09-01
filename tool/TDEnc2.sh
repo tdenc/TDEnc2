@@ -13,7 +13,7 @@ current_version="2.98"
 # use PID for multiple-running
 temp_dir="temp/$$"
 mkdir -p "${temp_dir}" >/dev/null 2>&1
-temp_264="${temp_dir}/video.h264"
+temp_264="${temp_dir}/video.mp4"
 temp_wav="${temp_dir}/audio.wav"
 temp_m4a="${temp_dir}/audio.m4a"
 temp_mp4="${temp_dir}/movie.mp4"
@@ -977,7 +977,10 @@ tdeVideoEncode()
     ffmpeg_filter=$(tdeFilterAppend "${ffmpeg_filter}" "fps=${out_fps}")
   fi
   # add filterchain to ffmpeg_option
-  ffmpeg_option="${ffmpeg_option} -sar 1/1 -vf ${ffmpeg_filter}"
+  ffmpeg_option="${ffmpeg_option} -sar 1/1"
+  if [ -n "${ffmpeg_filter}" ]; then
+    ffmpeg_option="${ffmpeg_option} -vf ${ffmpeg_filter}"
+  fi
 
   # define other options
   # denoise
@@ -1318,12 +1321,10 @@ tdeMP4()
 
   # start muxing
   if [ "${question_info[2]}" -eq 7 ]; then
-    ${tool_ffmpeg} -loglevel quiet -i "${temp_264}" -an -vcodec copy "${temp_dir}/video.h264"
-    temp_264="${temp_dir}/video.h264"
-  else
-    mp4_fps="-r ${out_fps}"
+    ${tool_ffmpeg} -loglevel quiet -i "${temp_264}" -an -vcodec copy "${temp_dir}/video.mp4"
+    temp_264="${temp_dir}/video.mp4"
   fi
-  ${tool_ffmpeg} ${mp4_fps} -i "${temp_264}" -i "${temp_m4a}" -vcodec copy -acodec copy "${temp_mp4}"
+  ${tool_ffmpeg} -i "${temp_264}" -i "${temp_m4a}" -vcodec copy -acodec copy "${temp_mp4}"
 
   # backup
   [ -e "${output_mp4name}" ] && mv "${output_mp4name}" "${mp4_dir}/old.mp4"
