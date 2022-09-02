@@ -3,8 +3,6 @@
 # 弄るならuser_setting.confの方にしてくだしあ
 
 tool_ffmpeg="ffmpeg"
-tool_x264="x264"
-tool_MP4Box="MP4Box"
 tool_mediainfo="mediainfo"
 mac_aacEnc="afconvert"
 linux_aacEnc="neroAacEnc"

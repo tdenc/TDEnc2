@@ -2,8 +2,6 @@ TDEnc2に関しては、GPL version2のライセンスにおいて配布しま�
 
 また、TDEnc2が利用している各ツールは以下のサイトから取得したものを利用しています。
  MediaInfo( http://mediainfo.sourceforge.net/ )
- x264( http://www.videolan.org/developers/x264.html )
- MP4Box( https://github.com/maki-rxrz/gpac )
  FFmpeg( http://www.ffmpeg.org/ )
 
 各ツールのバイナリ等を含めて再配布する場合は、各ライセンスに従ってください。
