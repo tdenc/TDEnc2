@@ -1401,7 +1401,7 @@ tdeToolUpdate()
     unzip -qjo ../Archives/Mac.zip 2>/dev/null
     # TODO: for linux and windows
   fi
-  chmod +x ${tool_ffmpeg} ${tool_x264} ${tool_mediainfo}
+  chmod +x ${tool_ffmpeg} ${tool_mediainfo}
 }
 
 # }}}
