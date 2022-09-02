@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script
-current_version="2.98"
+current_version="2.99"
 
 # make a directory for temporary files
 # use PID for multiple-running
