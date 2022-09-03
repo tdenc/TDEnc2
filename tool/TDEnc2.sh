@@ -1461,7 +1461,7 @@ EOF
       # backup old user settings
       [ -d "../setting/backup" ] || mkdir -p "../setting/backup" >/dev/null 2>&1
       cp -fpR ../setting/*.conf ../setting/backup/
-      curl -o master.zip -L "https://github.com/tdenc/TDEnc2/archive/master.zip"
+      curl -o master.zip -L "https://codeload.github.com/tdenc/TDEnc2/zip/refs/heads/master"
       unzip -qo master.zip 2>/dev/null
       cp -fpR TDEnc2-master/* ../
       chmod +x TDEnc2.sh ../TDEnc2.app/Contents/MacOS/droplet
