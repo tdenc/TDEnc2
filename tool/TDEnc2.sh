@@ -7,7 +7,7 @@ cd "${current_dir}"
 
 ### Variables ### {{{
 # version of this script
-current_version="2.99"
+current_version="2.999"
 
 # make a directory for temporary files
 # use PID for multiple-running
@@ -1489,18 +1489,6 @@ if [ "$?" -eq 0 ]; then
 else
   tool_ffmpeg=$(which ${tool_ffmpeg} 2>/dev/null)
   [ -z "${tool_ffmpeg}" ] && tdeEcho $tool_error{1,2} && tdeError
-fi
-./${tool_x264} -h >/dev/null 2>&1
-if [ "$?" -eq 0 ]; then
-  tool_x264="./${tool_x264}"
-else
-  tool_x264=$(which ${tool_x264} 2>/dev/null)
-  [ -z "${tool_x264}" ] && tdeEcho $tool_error{1,2} && tdeError
-fi
-tool_x264_version=$(${tool_x264} --version | head -n1)
-if $(echo "${tool_x264_version}" | grep -ivq "${current_x264_version}"); then
-  rm ${tool_x264}
-  tdeToolUpdate
 fi
 mediainfo_check=($(./${tool_mediainfo} --version 2>/dev/null))
 if [ "${mediainfo_check}" = "MediaInfo" ]; then
